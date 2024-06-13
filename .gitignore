@@ -1,2 +1,4 @@
 repos/*
+frames/*
+data/*
 .DS_Store
