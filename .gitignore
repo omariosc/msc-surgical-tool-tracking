@@ -1,4 +1,7 @@
 repos/*
 frames/*
+results/*
 data/*
+*.mp4
 .DS_Store
+*.pt
