@@ -5,3 +5,5 @@ data/*
 *.mp4
 .DS_Store
 *.pt
+runs/
+tmp/
