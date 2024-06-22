@@ -2,7 +2,63 @@ import os
 import cv2
 import numpy as np
 import matplotlib.pyplot as plt
+import sys
 import gc  # Garbage collection module
+
+
+# Open folder /Volumes/Exodus/Data/PETRAW/Training/Training/Video and convert all mp4 into images 
+# with same resolution and save them in /Volumes/Exodus/Data/PETRAW/Training/Training/Images/{vid_name}
+def split_video(video_path, vid_name, output_folder):
+    vidcap = cv2.VideoCapture(video_path)
+    success, image = vidcap.read()
+    count = 0
+    while success:
+        # should be 'frame00000000.png'
+        cv2.imwrite(
+            f"{output_folder}/{vid_name[5:]}frame{str(count).zfill(8)}.png", image
+        )  # save frame as PNG file
+        success, image = vidcap.read()
+        count += 1
+    print(f"Extracted {count} frames from {video_path}")
+
+
+def extract_frames():
+    DATA_PATH = (
+        "/Volumes/Exodus/Data/PETRAW/"
+        if os.path.exists("/Volumes/Exodus")
+        else "D:/Data/PETRAW/"
+    )
+
+    video_folder = os.path.join(DATA_PATH, "Test/Video")
+    output_folder = os.path.join(DATA_PATH, "Test/Images")
+
+    if not os.path.exists(output_folder):
+
+        os.makedirs(output_folder)
+
+    for root, _, files in os.walk(video_folder):
+
+        for file in files:
+
+            if file.endswith(".mp4") and not file.startswith("."):
+
+                vid_name = os.path.splitext(file)[0]
+
+                vid_path = os.path.join(root, file)
+
+                output_path = os.path.join(output_folder, vid_name)
+
+                if not os.path.exists(output_path):
+
+                    os.makedirs(output_path)
+
+                split_video(vid_path, vid_name, output_path)
+
+    # Rename every single image in the subfolders here to remove the first _ character
+    for root, _, files in os.walk(output_folder):
+        for file in files:
+            if file.startswith("_"):
+                os.rename(os.path.join(root, file), os.path.join(root, file[1:]))
 
 
 # Function to create YOLO annotations from masks
@@ -12,7 +68,7 @@ def create_annotations(
     # For each folder inside images_path, create a corresponding folder inside labels_path
     dirs = os.listdir(images_path_base)
     # Skip specified folders
-    folders_to_skip = ["008", "034", "021", "035", "037", "140", "141"]
+    folders_to_skip = []
     dirs = [d for d in dirs if d not in folders_to_skip]
     print(dirs)
 
@@ -123,7 +179,7 @@ def create_annotations(
 
                 # plt.imshow(cv2.cvtColor(image, cv2.COLOR_BGR2RGB))
                 # plt.axis("off")
-                # plt.show()
+                plt.show()
 
             # Force garbage collection after each batch
             gc.collect()
@@ -131,9 +187,17 @@ def create_annotations(
         print("Annotations created in YOLO format in", labels_path)
 
 
+DATA_PATH = (
+    "/Volumes/Exodus/Data/PETRAW/"
+    if os.path.exists("/Volumes/Exodus")
+    else "D:/Data/PETRAW/"
+)
+
+extract_frames()
+
 create_annotations(
-    images_path_base="/Volumes/Exodus/Data/PETRAW/Training/Training/Images/",
-    masks_path="/Volumes/Exodus/Data/PETRAW/Training/Training/Segmentation/",
-    labels_path="/Volumes/Exodus/Data/PETRAW/labels/train/",
-    n=None,
+    images_path_base=DATA_PATH + "Test/Images/",
+    masks_path=DATA_PATH + "Test/Segmentation/",
+    labels_path=DATA_PATH + "Test/Labels/",
+    n=2,
 )
