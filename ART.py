@@ -14,6 +14,10 @@ dataset_path = "D:/Data/ART-Net/"
 config_path = os.path.join(dataset_path, "data.yaml")
 config_path_test = os.path.join(dataset_path, "data-test.yaml")
 
+dataset_path = "D:/Data/ART-Net/"
+config_path = os.path.join(dataset_path, "data.yaml")
+config_path_test = os.path.join(dataset_path, "data-test.yaml")
+
 def train():
     # Load a pre-trained YOLOv8 model
     model = YOLO("chkpts/YOLOv8/yolov8x-seg.pt")
