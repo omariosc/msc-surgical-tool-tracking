@@ -8,3 +8,4 @@ data/*
 tmp/
 magic_packet.py
 chkpts/*
+runs/
