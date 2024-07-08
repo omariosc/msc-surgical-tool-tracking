@@ -6,7 +6,7 @@ import sys
 import gc  # Garbage collection module
 
 
-# Open folder /Volumes/Exodus/Data/PETRAW/Training/Training/Video and convert all mp4 into images 
+# Open folder /Volumes/Exodus/Data/PETRAW/Training/Training/Video and convert all mp4 into images
 # with same resolution and save them in /Volumes/Exodus/Data/PETRAW/Training/Training/Images/{vid_name}
 def split_video(video_path, vid_name, output_folder):
     vidcap = cv2.VideoCapture(video_path)
@@ -36,23 +36,29 @@ def extract_frames():
 
         os.makedirs(output_folder)
 
-    for root, _, files in os.walk(video_folder):
+    videos = os.listdir(video_folder)
+    # remove anything beginning with a dot
+    videos = [v for v in videos if not v.startswith(".")]
+    # remove video f the name before .mp4 exists in outputfodler already
+    videos = [v for v in videos if not os.path.exists(os.path.join(output_folder, os.path.splitext(v)[0]))]
+    print(videos)
+    videos.append("113.mp4") # temp
 
-        for file in files:
+    for file in videos:
 
-            if file.endswith(".mp4") and not file.startswith("."):
+        if file.endswith(".mp4") and not file.startswith("."):
 
-                vid_name = os.path.splitext(file)[0]
+            vid_name = os.path.splitext(file)[0]
 
-                vid_path = os.path.join(root, file)
+            vid_path = os.path.join(video_folder, file)
 
-                output_path = os.path.join(output_folder, vid_name)
+            output_path = os.path.join(output_folder, vid_name)
 
-                if not os.path.exists(output_path):
+            if not os.path.exists(output_path):
 
-                    os.makedirs(output_path)
+                os.makedirs(output_path)
 
-                split_video(vid_path, vid_name, output_path)
+            split_video(vid_path, vid_name, output_path)
 
     # Rename every single image in the subfolders here to remove the first _ character
     for root, _, files in os.walk(output_folder):
@@ -67,11 +73,12 @@ def create_annotations(
 ):
     # For each folder inside images_path, create a corresponding folder inside labels_path
     dirs = os.listdir(images_path_base)
-    # Skip specified folders
-    folders_to_skip = []
-    dirs = [d for d in dirs if d not in folders_to_skip]
-    print(dirs)
-
+    # # Skip specified folders
+    # folders_to_keep = ["113"]
+    # # keep all folders, except those in images_path_base, but keep those in folders_to_keep
+    # dirs = [f for f in dirs if f not in images_path_base and f not in folders_to_keep]
+    # print(dirs)
+    # quit()
     for folder in dirs:
         labels_folder = os.path.join(labels_path, folder)
         images_folder = os.path.join(images_path_base, folder)
@@ -110,7 +117,7 @@ def create_annotations(
             for image_file in batch_files:
                 image_path = os.path.join(images_folder, image_file)
                 mask_file = os.path.join(masks_path, folder, image_file)
-                print(mask_file)
+                # print(mask_file)
                 mask_path = os.path.join(masks_path, mask_file)
 
                 label_file = os.path.join(
@@ -168,7 +175,7 @@ def create_annotations(
                         lf.write(f"1 {' '.join(map(str, normalized_contour))}\n")
 
                 # Use matplotlib to draw the images with bounding box
-                print(image_path)
+                # print(image_path)
                 # image = cv2.imread(image_path)
                 # for contour in contours_red:
                 #     x, y, w, h = cv2.boundingRect(contour)
@@ -179,10 +186,13 @@ def create_annotations(
 
                 # plt.imshow(cv2.cvtColor(image, cv2.COLOR_BGR2RGB))
                 # plt.axis("off")
-                plt.show()
+                # plt.show()
+                print(f"Processed {image_file}")
 
             # Force garbage collection after each batch
             gc.collect()
+            gc.collect()
+            print(f"Processed {len(batch_files)} images in {folder}")
 
         print("Annotations created in YOLO format in", labels_path)
 
@@ -193,11 +203,11 @@ DATA_PATH = (
     else "D:/Data/PETRAW/"
 )
 
-extract_frames()
+# extract_frames()
 
 create_annotations(
-    images_path_base=DATA_PATH + "Test/Images/",
-    masks_path=DATA_PATH + "Test/Segmentation/",
-    labels_path=DATA_PATH + "Test/Labels/",
-    n=2,
+    images_path_base=DATA_PATH + "Training/Training/Images/",
+    masks_path=DATA_PATH + "Training/Training/Segmentation/",
+    labels_path=DATA_PATH + "labels/train/",
+    n=None,
 )
