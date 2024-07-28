@@ -5,35 +5,29 @@ This is a private repository for the MSc in my PhD project: "Surgical Skill Impr
 ## Repository Code
 
 - ART-Net
-  - 
+  - Paper focus.
 - ConvLSTM
-  -
+  - Potential paper focus. Object detection and tracking.
 - daVinci tracking
-  - 
+  - YOLOv5.
 - Dresden
-  - 
+  - Comparing annotations.
 - EndoVis 2017
-  - 
+  - Segmentation code.
 - Keypoint Annotation
-  -
-- loza
-  - 
-- M2CAI
-  - 
+  - Will be used for annotation.
 - Particle Filter
-  - 
-- Pose Estimation 1
-  - 
-- Pose Estimation 2
-  - 
+  - For robotic tracking so may not be useful.
+- Pose Estimation
+  - May be useful for pose estimation visualisation in 3D.
 - Segmentation
-  - 
+  - Very useful code for segmentation on EndoVis 2017 dataset.
 - surgtoolloc
-  - 
+  - A useful MONAI file
 - t-test
-  - 
+  - Can perform paired t-test to establish deep learning model's statistical significance.
 - Tool Pose Annotation
-  - 
+  - Can create poses. Did not work on OSX but can try on Windows.
 
 ## Datasets
 
