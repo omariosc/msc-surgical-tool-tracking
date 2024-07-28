@@ -5,8 +5,7 @@ data/*
 *.mp4
 .DS_Store
 *.pt
-tmp/
-magic_packet.py
+tmp*
 chkpts/*
 runs/
 .vscode
