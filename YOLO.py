@@ -1,6 +1,7 @@
 import os
 import matplotlib.pyplot as plt
 from ultralytics import YOLO
+# from ultralytics import YOLOv10
 from multiprocessing import freeze_support
 import torch
 
@@ -25,7 +26,8 @@ config_path_combined = os.path.join("yaml/data-combined.yaml")
 def train():
     # Load a pre-trained YOLOv8 model
     # model = YOLO("chkpts/YOLOv8/yolov8x-seg.pt")
-    model = YOLO("chkpts/ART/yolov8x-semiseg-artnet2/weights/best.pt")
+    model = YOLO("chkpts/ART/yolov8m-semiseg-artnet2/weights/best.pt")
+    # model = YOLO("chkpts/ART/yolov10m/best.pt")
 
     # Put model on GPU
     model.to(device)
