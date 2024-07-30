@@ -2,8 +2,8 @@
 
 | Day | Date | Tasks |
 |-------|------|-------|
-| 1 | Mon 29th Jul | ~~Planned a detailed timeline by tasks per day. Download ART-Net Dataset. Convert ART-Net segmentation maps to bounding boxes for the entire tool and tooltip and prepare data in YOLO format.~~ |
-| 2 | Tues 30th Jul | Begin training the YOLOv10 model on detection on the ART-Net dataset. Adapt the ART-Net method as the anchor-free approach, validate reproducibility and then test on the ART-Net dataset. |
+| 1 | Mon 29th Jul | ~~Planned a detailed timeline by tasks per day. Download ART-Net Dataset. Convert ART-Net segmentation maps to bounding boxes for the entire tool and tooltip and prepare data in YOLO format. Begin training the YOLOv10 model on detection on the ART-Net dataset. ~~ |
+| 2 | Tues 30th Jul | Train a more bulky model on the ART-Net dataset. Adapt the ART-Net method as the anchor-free approach, validate reproducibility and then test on the ART-Net dataset. |
 | 3 | Wed 31st Jul | Adapt the annotation software to annotate bounding box and tool tips. Label videos 3, 5 and 6 completely. |
 | 4 | Thurs 1st Aug | Ideally, out of 23 videos, we have 20 semi-labelled with a sliding window of 10 images every 100 frames, where we can employ a cross-validation split of 80/20 (16 for training and 4 for validation in each fold) and 3 for testing (completely labelled so that we can evaluate the model on unseen data and be confident in the result). We can also then test on 1%, 5%, and 10% labelled data. |
 | 5 | Fri 2nd Aug | Reserve day for catchup. Otherwise labelling data. |
