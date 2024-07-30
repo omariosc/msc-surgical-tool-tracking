@@ -54,8 +54,8 @@ def train(n):
         imgsz=640,
         # resume=True,
         single_cls=False,
-        save_dir="chkpts/ART",
-        project="chkpts/ART",
+        save_dir=f"chkpts/ART/v10{n}",
+        project=f"chkpts/ART/v10{n}",
         name=f"yolov10{n}-detect-art",
         save_conf=True,
         save_crop=True,
@@ -91,7 +91,7 @@ def train(n):
 
 
 def test(n):
-    model = YOLOv10(f"chkpts/ART/yolov10{n}-detect-art/weights/best.pt")
+    model = YOLOv10(f"chkpts/ART/v10{n}/yolov10{n}-detect-art/weights/best.pt")
     model.to(device)
     results = model.val(data=config_path)
     print(results.results_dict)
@@ -109,20 +109,20 @@ def test(n):
 if __name__ == "__main__":
     freeze_support()
 
-    models = ["n", "s", "b", "l", "x"]
+    models = ["n", "s", "m", "b", "l", "x"]
     
     for m in models:
      
         # Save output to a file
         orig_stdout = sys.stdout
-        f = open(f"chkpts/ART/yolov10{m}-code-out.txt", "w")
+        f = open(f"chkpts/ART/v10{m}/yolov10{m}-code-out.txt", "w")
         sys.stdout = f
 
         # Train the model
         train(m)
         
         # Test the model
-        test("m")
+        test(m)
 
         sys.stdout = orig_stdout
         f.close()
