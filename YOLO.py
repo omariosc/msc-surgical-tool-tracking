@@ -17,7 +17,7 @@ dataset_path = "data/ART-Net/"
 
 # Create a configuration file for YOLOv8
 # config_content = f"""
-# datasets: 
+# datasets:
 # train: ../{dataset_path}/images/train
 # val: ../{dataset_path}/images/val
 
@@ -42,9 +42,8 @@ config_path = "yaml/ART-Net Multiclass.yaml"
 def train(n):
     # Load a pre-trained YOLOv8 model
     # model = YOLO("chkpts/YOLOv8/yolov8x-seg.pt")
-    # model = YOLO("chkpts/ART/yolov8m-semiseg-artnet2/weights/best.pt")
     model = YOLOv10(f"chkpts/YOLOv10/yolov10{n}.pt")
-
+    # model = YOLOv10(f"chkpts/ART/yolov10{n}-detect-art/weights/last.pt")
     # Put model on GPU
     model.to(device)
 
@@ -60,6 +59,8 @@ def train(n):
         name=f"yolov10{n}-detect-art",
         save_conf=True,
         save_crop=True,
+        save_txt=True,
+        save_json=True,
         optimize=True,
         amp=True,
         patience=10,
@@ -91,38 +92,40 @@ def train(n):
 
 
 def test(n):
-    model = YOLOv10(f"chkpts/ART/yolov10{n}-detect-art/best.pt")
+    model = YOLOv10(f"chkpts/ART/yolov10{n}-detect-art/weights/best.pt")
     model.to(device)
     results = model.val(data=config_path)
     print(results.results_dict)
 
-    # model.track(
-    #     # "D:\Data\RARP-45_train/train\Log_D2P280782_2017.11.20_12.20.03_4\DVC\EndoscopeImageMemory_0_sync.avi",
-    #     "D:\Data\PETRAW\Test\Video\/054.mp4",
-    #     # "data/6DOF/Test 1/Task1_stitched_video.mp4",
-    #     tracker="bytetrack.yaml",
-    #     save=True,
-    #     show=True,
-    # )
+    model.track(
+        # "D:\Data\RARP-45_train/train\Log_D2P280782_2017.11.20_12.20.03_4\DVC\EndoscopeImageMemory_0_sync.avi",
+        # "D:\Data\PETRAW\Test\Video\/054.mp4",
+        "data/6DOF/Dataset.mp4",
+        tracker="bytetrack.yaml",
+        save=True,
+        show=False,
+    )
 
 
 if __name__ == "__main__":
     freeze_support()
 
     models = ["n", "s", "b", "l", "x"]
-
-    # Train models
+    
     for m in models:
-        # Save output to a file
-        orig_stdout = sys.stdout
-        f = open(f"chkpts/ART/yolov10{m}-output.txt", "w")
-        sys.stdout = f
-
         train(m)
+        test(m)
+        
+    #     # Save output to a file
+    #     orig_stdout = sys.stdout
+    #     f = open(f"chkpts/ART/yolov10{m}-output.txt", "w")
+    #     sys.stdout = f
 
-        sys.stdout = orig_stdout
-        f.close()
+    #     # Train the model
+    #     train(m)
+        
+    #     # Test the model
+    #     test("m")
 
-
-# Test the model
-# test()
+    #     sys.stdout = orig_stdout
+    #     f.close()
