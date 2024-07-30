@@ -1,4 +1,5 @@
 import os
+import sys
 import matplotlib.pyplot as plt
 from ultralytics import YOLO
 from ultralytics import YOLOv10
@@ -10,23 +11,23 @@ seed = 0
 torch.manual_seed(seed)
 torch.cuda.manual_seed(seed)
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-print(device)
+# print(device)
 
 dataset_path = "data/ART-Net/"
 
 # Create a configuration file for YOLOv8
-config_content = f"""
-datasets: 
-train: ../{dataset_path}/images/train
-val: ../{dataset_path}/images/val
+# config_content = f"""
+# datasets: 
+# train: ../{dataset_path}/images/train
+# val: ../{dataset_path}/images/val
 
-nc: 2  # number of classes
-names: ['tool', 'tip']  # class names
-"""
+# nc: 2  # number of classes
+# names: ['tool', 'tip']  # class names
+# """
 
-config_path = os.path.join("yaml/ART-Net Multiclass.yaml")
-with open(config_path, "w") as file:
-    file.write(config_content)
+# config_path = os.path.join("yaml/ART-Net Multiclass.yaml")
+# with open(config_path, "w") as file:
+#     file.write(config_content)
 
 config_path = "yaml/ART-Net Multiclass.yaml"
 # config_path_test = os.path.join(dataset_path, "data-small-test.yaml")
@@ -37,25 +38,26 @@ config_path = "yaml/ART-Net Multiclass.yaml"
 # config_path_test = os.path.join(dataset_path, "data-test.yaml")
 # config_path_final = os.path.join(dataset_path, "data-final.yaml")
 
-def train():
+
+def train(n):
     # Load a pre-trained YOLOv8 model
     # model = YOLO("chkpts/YOLOv8/yolov8x-seg.pt")
     # model = YOLO("chkpts/ART/yolov8m-semiseg-artnet2/weights/best.pt")
-    model = YOLOv10("chkpts/YOLOv10/yolov10n.pt")
+    model = YOLOv10(f"chkpts/YOLOv10/yolov10{n}.pt")
 
     # Put model on GPU
     model.to(device)
 
-    # Train the model with only 10 images instead of the full dataset
+    # Train the model
     model.train(
         data=config_path,
-        epochs=1,
+        epochs=300,
         imgsz=640,
         # resume=True,
         single_cls=False,
         save_dir="chkpts/ART",
         project="chkpts/ART",
-        name="yolov10n-detect-art",
+        name=f"yolov10{n}-detect-art",
         save_conf=True,
         save_crop=True,
         optimize=True,
@@ -65,7 +67,7 @@ def train():
     )
 
     # Save the model checkpoint to a file
-    checkpoint = model.save("chkpts/ART/yolov10n-detect-art")
+    # checkpoint = model.save("chkpts/ART/yolov10{n}-detect-art/1.pt")
 
     # Train the model for more epochs
     # model = YOLO("chkpts/ART/yolov8x-semiseg-artnet.pt")
@@ -87,8 +89,9 @@ def train():
     #     save_period=1,
     # )
 
-def test():
-    model = YOLO("chkpts/combined/yolov10n-detect-art/best.pt")
+
+def test(n):
+    model = YOLOv10(f"chkpts/ART/yolov10{n}-detect-art/best.pt")
     model.to(device)
     results = model.val(data=config_path)
     print(results.results_dict)
@@ -102,11 +105,24 @@ def test():
     #     show=True,
     # )
 
+
 if __name__ == "__main__":
     freeze_support()
 
-    # Train the model
-    train()
-    
-    # Test the model
-    # test()
+    models = ["n", "s", "b", "l", "x"]
+
+    # Train models
+    for m in models:
+        # Save output to a file
+        orig_stdout = sys.stdout
+        f = open(f"chkpts/ART/yolov10{m}-output.txt", "w")
+        sys.stdout = f
+
+        train(m)
+
+        sys.stdout = orig_stdout
+        f.close()
+
+
+# Test the model
+# test()
