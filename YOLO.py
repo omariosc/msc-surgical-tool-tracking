@@ -60,7 +60,6 @@ def train(n):
         save_conf=True,
         save_crop=True,
         save_txt=True,
-        save_json=True,
         optimize=True,
         amp=True,
         patience=10,
@@ -113,19 +112,17 @@ if __name__ == "__main__":
     models = ["n", "s", "b", "l", "x"]
     
     for m in models:
+     
+        # Save output to a file
+        orig_stdout = sys.stdout
+        f = open(f"chkpts/ART/yolov10{m}-code-out.txt", "w")
+        sys.stdout = f
+
+        # Train the model
         train(m)
-        test(m)
         
-    #     # Save output to a file
-    #     orig_stdout = sys.stdout
-    #     f = open(f"chkpts/ART/yolov10{m}-output.txt", "w")
-    #     sys.stdout = f
+        # Test the model
+        test("m")
 
-    #     # Train the model
-    #     train(m)
-        
-    #     # Test the model
-    #     test("m")
-
-    #     sys.stdout = orig_stdout
-    #     f.close()
+        sys.stdout = orig_stdout
+        f.close()
