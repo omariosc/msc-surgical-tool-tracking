@@ -289,7 +289,28 @@ class ObjectTracker:
         # Add the detection to trackers (simplified for example)
         self.trackers.append(detections)
 
-        # Implement your tracking logic here (SORT, DeepSORT, or any other algorithm)
+        # Implement DeepSORT
+        if self.frame_count > 1:
+            # Get the previous detections
+            previous_detections = self.trackers[-2]
+
+            # Create cost matrix
+            cost_matrix = np.zeros((len(previous_detections), len(detections)))
+            for i, prev in enumerate(previous_detections):
+                for j, detection in enumerate(detections):
+                    cost_matrix[i, j] = 1 - self.iou(prev[0], detection[0])
+
+            # Perform Hungarian algorithm to assign detections to trackers
+            row_ind, col_ind = linear_sum_assignment(cost_matrix)
+
+            # Update the trackers with the new detections
+            for i, j in zip(row_ind, col_ind):
+                self.trackers[-2][i] = detections[j]
+                
+        # Remove old tracks
+        if self.frame_count > self.max_age:
+            self.trackers.pop(0)
+    
 
     def get_tracks(self):
         """Get the tracked object paths."""
@@ -361,6 +382,9 @@ print(f"Using device: {device}")
 
 # Move model to the appropriate device
 model = SIMOModel(n_classes=4).to(device)
+
+# checkpoints folder
+checkpoints_folder = "chkpts/SIMO/weights"
 
 # Define optimizer
 optimizer = optim.Adam(model.parameters(), lr=0.001)
