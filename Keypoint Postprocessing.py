@@ -26,6 +26,10 @@ def create_yolo_format(coords, img_width, img_height):
 for filename in os.listdir(input_dir):
     if filename.endswith(".json"):
         json_path = os.path.join(input_dir, filename)
+        
+        # Delete the JSON file
+        # os.remove(json_path)
+        
         with open(json_path, "r") as f:
             data = json.load(f)
             coords = data["tooltips"]
@@ -66,8 +70,6 @@ for filename in os.listdir(input_dir):
                 f"1 {right_tool_yolo[0]} {right_tool_yolo[1]} {right_tool_yolo[2]} {right_tool_yolo[3]}\n"
             )
 
-        # Delete the JSON file
-        os.remove(json_path)
 
         # Remove the corresponding PNG file
         png_filename = f"{base_filename}_seg.png"
