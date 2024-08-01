@@ -67,7 +67,7 @@ for filename in os.listdir(input_dir):
                 f"0 {left_tool_yolo[0]} {left_tool_yolo[1]} {left_tool_yolo[2]} {left_tool_yolo[3]}\n"
             )
             f.write(
-                f"1 {right_tool_yolo[0]} {right_tool_yolo[1]} {right_tool_yolo[2]} {right_tool_yolo[3]}\n"
+                f"0 {right_tool_yolo[0]} {right_tool_yolo[1]} {right_tool_yolo[2]} {right_tool_yolo[3]}\n"
             )
 
 
