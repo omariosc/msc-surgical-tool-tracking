@@ -1,3 +1,6 @@
+# python3 setup.py install --user
+# python -m wat.run --data-dir ../../data/6DOF --port 1234 --maxtips 4
+
 import os
 import json
 
