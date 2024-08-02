@@ -1,3 +1,6 @@
+# python "SIMO Tracking.py" > chkpts/SIMO/results.txt
+
+from math import e
 import os
 import cv2
 import json
@@ -255,21 +258,26 @@ class ObjectTracker:
 
         # Implement DeepSORT
         if self.frame_count > 1:
-            # Get the previous detections
-            previous_detections = self.trackers[-2]
+            # May not be existing tracks
+            if len(self.trackers) == 0:
+                # Get the previous detections
+                previous_detections = self.trackers[-2]
 
-            # Create cost matrix
-            cost_matrix = np.zeros((len(previous_detections), len(detections)))
-            for i, prev in enumerate(previous_detections):
-                for j, detection in enumerate(detections):
-                    cost_matrix[i, j] = 1 - self.iou(prev[0], detection[0])
+                # Create cost matrix
+                cost_matrix = np.zeros((len(previous_detections), len(detections)))
+                for i, prev in enumerate(previous_detections):
+                    for j, detection in enumerate(detections):
+                        cost_matrix[i, j] = 1 - self.iou(prev[0], detection[0])
 
-            # Perform Hungarian algorithm to assign detections to trackers
-            row_ind, col_ind = linear_sum_assignment(cost_matrix)
+                # Perform Hungarian algorithm to assign detections to trackers
+                row_ind, col_ind = linear_sum_assignment(cost_matrix)
 
-            # Update the trackers with the new detections
-            for i, j in zip(row_ind, col_ind):
-                self.trackers[-2][i] = detections[j]
+                # Update the trackers with the new detections
+                for i, j in zip(row_ind, col_ind):
+                    self.trackers[-2][i] = detections[j]
+            else:
+                # Create new trackers for the detections
+                self.trackers.append(detections)
 
         # Remove old tracks
         if self.frame_count > self.max_age:
@@ -284,10 +292,7 @@ class ObjectTracker:
 
 # Define loss functions
 def iou(pred, target, smooth=1e-6):
-    # Ensure values are in the correct range
-    assert torch.all(pred >= 0) and torch.all(pred <= 1), "Predictions out of range"
-    assert torch.all(target >= 0) and torch.all(target <= 1), "Targets out of range"
-
+    pred, target = pred.to(device), target.to(device)
     intersection = (pred * target).sum()
     union = pred.sum() + target.sum() - intersection
     return (intersection + smooth) / (union + smooth)
@@ -298,9 +303,9 @@ def iou_loss(pred, target):
 
 
 def bce_iou_loss(pred, target):
-    bce_loss = F.binary_cross_entropy(pred, target, reduction="none")
+    bce_loss = F.binary_cross_entropy_with_logits(pred, target, reduction="none")
     iou_loss_value = iou(torch.sigmoid(pred), target)
-    return bce_loss + iou_loss_value
+    return (bce_loss.mean() + iou_loss_value.mean()).mean()
 
 
 class FocalLoss(nn.Module):
@@ -310,7 +315,7 @@ class FocalLoss(nn.Module):
         self.gamma = gamma
 
     def forward(self, inputs, targets):
-        BCE_loss = F.binary_cross_entropy(inputs, targets, reduction="none")
+        BCE_loss = F.binary_cross_entropy_with_logits(inputs, targets, reduction="none")
         pt = torch.exp(-BCE_loss)
         F_loss = self.alpha * (1 - pt) ** self.gamma * BCE_loss
         return F_loss.mean()
@@ -319,41 +324,118 @@ class FocalLoss(nn.Module):
 focal_loss = FocalLoss()
 
 
-# Function to compute evaluation metrics
 def compute_metrics(pred_boxes, true_boxes, conf_scores, iou_threshold=0.5):
-    pred_boxes = pred_boxes.cpu().detach().numpy()
-    true_boxes = true_boxes.cpu().detach().numpy()
-    conf_scores = conf_scores.cpu().detach().numpy()
+    # Convert predictions and true boxes to binary format based on IoU threshold
+    binary_true_boxes = []
+    binary_pred_boxes = []
+    valid_conf_scores = []
 
+    for i in range(len(true_boxes)):
+        iou_scores = [
+            iou(pred_boxes[i].cpu(), true_boxes[j].cpu())
+            for j in range(len(true_boxes))
+        ]
+        max_iou = max(iou_scores)
+        if max_iou > iou_threshold:
+            binary_true_boxes.append(1)
+            binary_pred_boxes.append(1)
+        else:
+            binary_true_boxes.append(0)
+            binary_pred_boxes.append(0)
+        valid_conf_scores.append(conf_scores[i].cpu())
+
+    binary_true_boxes = np.array(binary_true_boxes)
+    binary_pred_boxes = np.array(binary_pred_boxes)
+    valid_conf_scores = np.array(valid_conf_scores)
+
+    # Compute precision-recall curve
     precisions, recalls, _ = precision_recall_curve(
-        true_boxes.ravel(), conf_scores.ravel()
+        binary_true_boxes, valid_conf_scores
     )
-    ap50 = average_precision_score(true_boxes.ravel(), conf_scores.ravel())
+    ap50 = average_precision_score(binary_true_boxes, valid_conf_scores)
 
-    # mAP calculation (AP for IoU > 0.5)
-    mAP = ap50
-
-    # mAP 50-95 calculation (should calculate over IoU thresholds from 0.5 to 0.95)
+    # Compute mAP 50-95
     iou_thresholds = np.linspace(0.5, 0.95, 10)
     aps = []
-    for iou_threshold in iou_thresholds:
-        tp, fp, fn = 0, 0, 0
-        for i in range(len(pred_boxes)):
+    for threshold in iou_thresholds:
+        binary_true_boxes = []
+        binary_pred_boxes = []
+        for i in range(len(true_boxes)):
             iou_scores = [
-                iou(pred_boxes[i], true_boxes[j]) for j in range(len(true_boxes))
+                iou(pred_boxes[i].cpu(), true_boxes[j].cpu())
+                for j in range(len(true_boxes))
             ]
             max_iou = max(iou_scores)
-            if max_iou > iou_threshold:
-                tp += 1
+            if max_iou > threshold:
+                binary_true_boxes.append(1)
+                binary_pred_boxes.append(1)
             else:
-                fp += 1
+                binary_true_boxes.append(0)
+                binary_pred_boxes.append(0)
 
-        ap = tp / (tp + fp)
+        ap = average_precision_score(binary_true_boxes, valid_conf_scores)
         aps.append(ap)
 
     mAP_50_95 = np.mean(aps)
 
-    return precisions, recalls, mAP, mAP_50_95
+    return precisions, recalls, ap50, mAP_50_95
+
+
+def compute_metrics(pred_boxes, true_boxes, conf_scores, iou_threshold=0.5):
+    # Convert predictions and true boxes to binary format based on IoU threshold
+    binary_true_boxes = []
+    binary_pred_boxes = []
+    valid_conf_scores = []
+
+    for i in range(len(true_boxes)):
+        iou_scores = [
+            iou(pred_boxes[i].cpu(), true_boxes[j].cpu())
+            for j in range(len(true_boxes))
+        ]
+        max_iou = max(iou_scores)
+        if max_iou > iou_threshold:
+            binary_true_boxes.append(1)
+            binary_pred_boxes.append(1)
+        else:
+            binary_true_boxes.append(0)
+            binary_pred_boxes.append(0)
+        valid_conf_scores.append(conf_scores[i].cpu().item())  # Convert to scalar
+
+    binary_true_boxes = np.array(binary_true_boxes)
+    binary_pred_boxes = np.array(binary_pred_boxes)
+    valid_conf_scores = np.array(valid_conf_scores)
+
+    # Compute precision-recall curve
+    precisions, recalls, _ = precision_recall_curve(
+        binary_true_boxes, valid_conf_scores
+    )
+    ap50 = average_precision_score(binary_true_boxes, valid_conf_scores)
+
+    # Compute mAP 50-95
+    iou_thresholds = np.linspace(0.5, 0.95, 10)
+    aps = []
+    for threshold in iou_thresholds:
+        binary_true_boxes = []
+        binary_pred_boxes = []
+        for i in range(len(true_boxes)):
+            iou_scores = [
+                iou(pred_boxes[i].cpu(), true_boxes[j].cpu())
+                for j in range(len(true_boxes))
+            ]
+            max_iou = max(iou_scores)
+            if max_iou > threshold:
+                binary_true_boxes.append(1)
+                binary_pred_boxes.append(1)
+            else:
+                binary_true_boxes.append(0)
+                binary_pred_boxes.append(0)
+
+        ap = average_precision_score(binary_true_boxes, valid_conf_scores)
+        aps.append(ap)
+
+    mAP_50_95 = np.mean(aps)
+
+    return precisions, recalls, ap50, mAP_50_95
 
 
 # Main function
@@ -428,13 +510,12 @@ def main():
                 )
 
             loss = loss_tool + loss_tooltip + conf_loss_tool + conf_loss_tooltip
+            loss = loss.mean()  # Make sure the loss is a scalar
 
             loss.backward()
             optimizer.step()
 
             running_loss += loss.item()
-            
-            break
 
         avg_train_loss = running_loss / len(train_loader)
         train_losses.append(avg_train_loss)
@@ -482,9 +563,7 @@ def main():
                 all_tooltip_preds.append(tooltip_preds)
                 all_tooltip_labels.append(tooltip_labels)
                 all_tooltip_conf.append(tooltip_conf)
-            
-                break
-            
+
         avg_val_loss = val_loss / len(val_loader)
         val_losses.append(avg_val_loss)
         print(f"Epoch {epoch+1}/{num_epochs}, Validation Loss: {avg_val_loss}")
@@ -503,8 +582,6 @@ def main():
                 break
         else:
             patience = 10
-            
-        break
 
     # Evaluation Metrics
     tool_preds = torch.cat(all_tool_preds)
@@ -540,8 +617,8 @@ def main():
                 "mAP_50_95": mAP_50_95_tip,
             },
         }
-        
-        json.dump(metrics, f)        
+
+        json.dump(metrics, f)
 
     # Plot Precision-Recall Curve
     plt.figure(figsize=(12, 8))
@@ -552,7 +629,7 @@ def main():
     plt.title("Precision-Recall Curve for Tool and Tooltip")
     plt.grid(True)
     plt.savefig("chkpts/SIMO/precision_recall_curve.png")
-    plt.show()
+    # plt.show()
 
     # Function to visualize bounding boxes on an image
     def visualize_bounding_boxes(image, tool_preds, tooltip_preds, save_path=None):
@@ -593,7 +670,7 @@ def main():
     # Test the model on sample image
     image_path = "data/ART-Net/images/train/Train_Pos_sample_0001.png"
     image = Image.open(image_path)
-    image = F.to_tensor(image)
+    image = functional.to_tensor(image)
     image = functional.resize(image, (512, 512))
     image = image.unsqueeze(0).to(device)
 
