@@ -342,63 +342,6 @@ def compute_metrics(pred_boxes, true_boxes, conf_scores, iou_threshold=0.5):
         else:
             binary_true_boxes.append(0)
             binary_pred_boxes.append(0)
-        valid_conf_scores.append(conf_scores[i].cpu())
-
-    binary_true_boxes = np.array(binary_true_boxes)
-    binary_pred_boxes = np.array(binary_pred_boxes)
-    valid_conf_scores = np.array(valid_conf_scores)
-
-    # Compute precision-recall curve
-    precisions, recalls, _ = precision_recall_curve(
-        binary_true_boxes, valid_conf_scores
-    )
-    ap50 = average_precision_score(binary_true_boxes, valid_conf_scores)
-
-    # Compute mAP 50-95
-    iou_thresholds = np.linspace(0.5, 0.95, 10)
-    aps = []
-    for threshold in iou_thresholds:
-        binary_true_boxes = []
-        binary_pred_boxes = []
-        for i in range(len(true_boxes)):
-            iou_scores = [
-                iou(pred_boxes[i].cpu(), true_boxes[j].cpu())
-                for j in range(len(true_boxes))
-            ]
-            max_iou = max(iou_scores)
-            if max_iou > threshold:
-                binary_true_boxes.append(1)
-                binary_pred_boxes.append(1)
-            else:
-                binary_true_boxes.append(0)
-                binary_pred_boxes.append(0)
-
-        ap = average_precision_score(binary_true_boxes, valid_conf_scores)
-        aps.append(ap)
-
-    mAP_50_95 = np.mean(aps)
-
-    return precisions, recalls, ap50, mAP_50_95
-
-
-def compute_metrics(pred_boxes, true_boxes, conf_scores, iou_threshold=0.5):
-    # Convert predictions and true boxes to binary format based on IoU threshold
-    binary_true_boxes = []
-    binary_pred_boxes = []
-    valid_conf_scores = []
-
-    for i in range(len(true_boxes)):
-        iou_scores = [
-            iou(pred_boxes[i].cpu(), true_boxes[j].cpu())
-            for j in range(len(true_boxes))
-        ]
-        max_iou = max(iou_scores)
-        if max_iou > iou_threshold:
-            binary_true_boxes.append(1)
-            binary_pred_boxes.append(1)
-        else:
-            binary_true_boxes.append(0)
-            binary_pred_boxes.append(0)
         valid_conf_scores.append(conf_scores[i].cpu().item())  # Convert to scalar
 
     binary_true_boxes = np.array(binary_true_boxes)
