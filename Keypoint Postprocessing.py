@@ -18,19 +18,29 @@ def create_yolo_format(coords, img_width, img_height):
     return x_center, y_center, width, height
 
 
-def check_nulls(input_dir):
+def check_nulls(input_dir, original_dir):
     # Iterate over all JSON files in the directory
     for filename in os.listdir(input_dir):
         if filename.endswith(".json"):
             # check if "null" is in the file contents
             with open(os.path.join(input_dir, filename), "r") as f:
                 contents = f.read()
-                if "null" in contents:
+                if "null" in contents or "None" in contents or "[]" in contents:
                     print(f"Skipping {filename} due to null")
-                    continue
+
+                    # Delete the seg png and json files
+                    base_filename = os.path.splitext(filename)[0]
+                    png_path = os.path.join(input_dir, f"{base_filename}_seg.png")
+                    json_path = os.path.join(input_dir, f"{base_filename}.json")
+                    if os.path.exists(png_path):
+                        os.remove(png_path)
+                    if os.path.exists(json_path):
+                        os.remove(json_path)
+                    # Move original image to the original folder
+                    os.rename(os.path.join(input_dir, f"{base_filename}.png"), os.path.join(original_dir, f"{base_filename}.png"))
 
 
-def process(input_dir, output_label_dir, output_image_dir):
+def process(input_dir, output_label_dir, output_image_dir, n):
     # Iterate over all JSON files in the directory
     for filename in os.listdir(input_dir):
         if filename.endswith(".json"):
@@ -72,7 +82,7 @@ def process(input_dir, output_label_dir, output_image_dir):
 
             # Create output filename and path
             base_filename = os.path.splitext(filename)[0]
-            output_filename = f"test5_{base_filename}.txt"
+            output_filename = f"test{n}_{base_filename}.txt"
             output_path = os.path.join(output_image_dir, output_filename)
 
             # Overwrite the existing file if exists
@@ -92,7 +102,7 @@ def process(input_dir, output_label_dir, output_image_dir):
 
             # Rename the base_filename.png file to include the "test5_" prefix
             png_path = os.path.join(input_dir, f"{base_filename}.png")
-            new_png_path = os.path.join(output_label_dir, f"test5_{base_filename}.png")
+            new_png_path = os.path.join(output_label_dir, f"test{n}_{base_filename}.png")
 
             if os.path.exists(png_path):
                 os.rename(png_path, new_png_path)
@@ -103,18 +113,42 @@ if __name__ == "__main__":
     DATA = "test" if TEST == 5 else "train"
 
     # Directory containing the JSON and PNG files
-    input_dir = "data/6DOF/output copy/"
-    output_dir = f"data/6DOF/Test {TEST}/"
-    output_image_dir = f"{output_dir}/images/{DATA}/"
-    output_label_dir = f"{output_dir}/labels/{DATA}/"
+    original_dir = "data/6DOF/input/"
 
-    if not os.path.exists(output_image_dir):
-        os.makedirs(output_image_dir)
+    # input_dir = "data/6DOF/output/"
+    # output_dir = f"data/6DOF/Test {TEST}/"
+    # output_image_dir = f"{output_dir}/images/{DATA}/"
+    # output_label_dir = f"{output_dir}/labels/{DATA}/"
 
-    if not os.path.exists(output_label_dir):
-        os.makedirs(output_label_dir)
-        
-    check_nulls(input_dir)
-    process(input_dir, output_label_dir, output_image_dir)
+    # if not os.path.exists(output_image_dir):
+    #     os.makedirs(output_image_dir)
 
-    print("Processing completed.")
+    # if not os.path.exists(output_label_dir):
+    #     os.makedirs(output_label_dir)
+
+    # check_nulls(input_dir, original_dir)
+    # # process(input_dir, output_label_dir, output_image_dir, TEST)
+
+    # print("Processing completed.")
+
+    for i in range(1, 25):
+        if i == TEST:
+            continue
+
+        original_dir = "H:/Data/6DOF/input/"
+        input_dir = "H:/Data/6DOF/output/"
+        base_dir = "C:/users/omarc/OneDrive - University of Leeds/PhD/Omar MSc Project/Code/data/6DOF"
+        output_dir = f"{base_dir}/Test {i}/"
+        output_image_dir = f"{base_dir}/images/train/"
+        output_label_dir = f"{base_dir}/labels/train/"
+
+        if not os.path.exists(output_image_dir):
+            os.makedirs(output_image_dir)
+
+        if not os.path.exists(output_label_dir):
+            os.makedirs(output_label_dir)
+
+        check_nulls(input_dir, original_dir)
+        process(input_dir, output_label_dir, output_image_dir, i)
+
+        print("Processing completed.")
