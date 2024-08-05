@@ -14,23 +14,23 @@ torch.cuda.manual_seed(seed)
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 # print(device)
 
-dataset_path = "data/ART-Net/"
+dataset_path = "data/6DOF/"
 
 # Create a configuration file for YOLOv10
-# config_content = f"""
-# datasets:
-# train: ../{dataset_path}/images/train
-# val: ../{dataset_path}/images/val
+config_content = f"""
+datasets:
+train: ../{dataset_path}/images/test
+val: ../data/ART-Net/images/val
 
-# nc: 2  # number of classes
-# names: ['tool', 'tip']  # class names
-# """
+nc: 2  # number of classes
+names: ['tool', 'tip']  # class names
+"""
 
-# config_path = os.path.join("yaml/ART-Net Multiclass.yaml")
-# with open(config_path, "w") as file:
-#     file.write(config_content)
+config_path = os.path.join("yaml/6DOF Single Class.yaml")
+with open(config_path, "w") as file:
+    file.write(config_content)
 
-config_path = "yaml/ART-Net Multiclass.yaml"
+config_path = "yaml/6DOF Single Class.yaml"
 # config_path_test = os.path.join(dataset_path, "data-small-test.yaml")
 # config_path_final = os.path.join(dataset_path, "data-small-final.yaml")
 # config_path_combined = os.path.join("yaml/data-combined.yaml")
@@ -43,7 +43,7 @@ config_path = "yaml/ART-Net Multiclass.yaml"
 def train(n):
     # Load a pre-trained YOLOv8 model
     # model = YOLO("chkpts/YOLOv8/yolov8x-seg.pt")
-    model = YOLOv10(f"chkpts/YOLOv10/yolov10{n}.pt")
+    model = YOLOv10(f"chkpts/ART/v10{n}/yolov10{n}-detect-art/weights/best.pt")
     # model = YOLOv10(f"chkpts/ART/yolov10{n}-detect-art/weights/last.pt")
     # Put model on GPU
     model.to(device)
@@ -54,10 +54,10 @@ def train(n):
         epochs=300,
         imgsz=640,
         # resume=True,
-        single_cls=False,
-        save_dir=f"chkpts/ART/v10{n}",
-        project=f"chkpts/ART/v10{n}",
-        name=f"yolov10{n}-detect-art",
+        single_cls=True,
+        save_dir=f"chkpts/6DOF/v10{n}",
+        project=f"chkpts/6DOF/v10{n}",
+        name=f"yolov10{n}-detect-6dof",
         save_conf=True,
         save_crop=True,
         save_txt=True,
@@ -92,7 +92,7 @@ def train(n):
 
 
 def test(n):
-    model = YOLOv10(f"chkpts/ART/v10{n}/yolov10{n}-detect-art/weights/best.pt")
+    model = YOLOv10(f"chkpts/6DOF/v10{n}/yolov10{n}-detect-6dof/weights/best.pt")
     model.to(device)
     results = model.val(data=config_path)
     print(results.results_dict)
@@ -116,7 +116,7 @@ if __name__ == "__main__":
 
         # Save output to a file
         orig_stdout = sys.stdout
-        f = open(f"chkpts/ART/v10{m}/yolov10{m}-code-out.txt", "w")
+        f = open(f"chkpts/6DOF/v10{m}/yolov10{m}-code-out.txt", "w")
         sys.stdout = f
 
         # Log time to train
@@ -130,7 +130,7 @@ if __name__ == "__main__":
         print(f"Time to train model {m}: {end - start}")
 
         # Test the model
-        test(m)
+        # test(m)
 
         sys.stdout = orig_stdout
         f.close()
