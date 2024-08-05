@@ -7,20 +7,20 @@
 | 3 | Wed 31st Jul | ~~Adapt the annotation software to annotate bounding box and tool tips.~~ |
 | 4 | Thurs 1st Aug | ~~Transition the detection problem to tracking. We need a way to consider IDs for each tool and deal with disappearing tools. YOLO should already deal with this, but we would need to adapt the ART-Net method here.~~ |
 | 5 | Fri 2nd Aug | ~~Partially labelled video 5.~~ |
-| 6 | Sat 3rd Aug | ~~Partially labelled video 5.~~ Ideally, out of 24 videos (107,698 images), we will have 22 semi-labelled with 1 image (1% labelled data) every 100 frames (1,021 + 2,943 from 1 completely labeleld video = 3,964), where we can employ a cross-validation split of ~80/20 (3,171/793) and a 2680-image test set (1 video exclusive for testing, completely labelled so that we can evaluate the model on unseen data and be confident in the result and see difference temporally). |
-| 7 | Sun 4th Aug | Continue labelling data. Test 5 and 6 must be completely labelled.|
-| 8 | Mon 5th Aug | Apply the YOLO model as the anchor-based approach and the ART-Net method as the anchor-free approach to the in-house dataset. |
-| 9 | Tues 6th Aug | Ideally, development will be finished by this date. Begin writing the report. Introduction. |
-| 10 | Wed 7th Aug | Introduction. |
-| 11 | Thurs 8th Aug | Need to recoup if development is not finished and start writing if not already. Background Research. |
-| 12 | Fri 9th Aug | Background Research. |
-| 13 | Sat 10th Aug | Background Research. |
+| 6 | Sat 3rd Aug | ~~Partially labelled video 5.~~ |
+| 7 | Sun 4th Aug | ~~Partially labelled video 5.~~ |
+| 8 | Mon 5th Aug | ~~Fully labelled video 5.~~ Ideally, out of 24 videos (107,698 images), we will have 22 semi-labelled with 1 image (1% labelled data) every 100 frames (1,021 + 2,943 from 1 completely labeleld video = 3,964), where we can employ a cross-validation split of ~80/20 (3,171/793) and a 2680-image test set (1 video exclusive for testing, completely labelled so that we can evaluate the model on unseen data and be confident in the result and see difference temporally). |
+| 9 | Tues 6th Aug | Fully labelled video 6. |
+| 10 | Wed 7th Aug | Apply the YOLO model as the anchor-based approach and the ART-Net method as the anchor-free approach to the in-house dataset. Also perform some CV techniques to help extract the tool, e.g. background removal. |
+| 11 | Thurs 8th Aug | Ideally, development will be finished by this date, though models may still be training. Begin writing the report with a draft abstract. |
+| 12 | Fri 9th Aug | Introduction. |
+| 13 | Sat 10th Aug | Introduction. |
 | 14 | Sun 11th Aug | Background Research. |
-| 15 | Mon 12th Aug | Methodology. |
-| 16 | Tues 13th Aug | Methodology. |
+| 15 | Mon 12th Aug | Background Research. |
+| 16 | Tues 13th Aug | Background Research. |
 | 17 | Wed 14th Aug | Methodology. |
 | 18 | Thurs 15th Aug | Methodology. |
-| 19 | Fri 16th Aug | Results. |
+| 19 | Fri 16th Aug | Methodology. |
 | 20 | Sat 17th Aug | Results. |
 | 21 | Sun 18th Aug | Results. |
 | 22 | Mon 19th Aug | Results. |
