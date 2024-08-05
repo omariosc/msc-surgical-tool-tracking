@@ -2,8 +2,10 @@
 
 from math import e
 import os
+from tracemalloc import start
 import cv2
 import json
+import time
 import torch
 import numpy as np
 import matplotlib.pyplot as plt
@@ -414,6 +416,7 @@ def main():
     optimizer = optim.Adam(model.parameters(), lr=0.001)
 
     # Training loop
+    start_time = time.time()
     num_epochs = 100
     patience = 5
     best_val_loss = np.inf
@@ -510,6 +513,9 @@ def main():
         avg_val_loss = val_loss / len(val_loader)
         val_losses.append(avg_val_loss)
         print(f"Epoch {epoch+1}/{num_epochs}, Validation Loss: {avg_val_loss}")
+        
+        end_time = time.time()
+        print(f"Time taken: {end_time - start_time} seconds")
 
         # Save model checkpoints
         torch.save(model.state_dict(), f"{checkpoints_folder}/epoch{epoch+1}.pt")

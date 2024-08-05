@@ -1,5 +1,6 @@
 import os
 import sys
+import time
 import matplotlib.pyplot as plt
 from ultralytics import YOLO
 from ultralytics import YOLOv10
@@ -110,17 +111,24 @@ if __name__ == "__main__":
     freeze_support()
 
     models = ["n", "s", "m", "b", "l", "x"]
-    
+
     for m in models:
-     
+
         # Save output to a file
         orig_stdout = sys.stdout
         f = open(f"chkpts/ART/v10{m}/yolov10{m}-code-out.txt", "w")
         sys.stdout = f
 
+        # Log time to train
+        print(f"Training model {m}")
+        start = time.time()
+
         # Train the model
         train(m)
         
+        end = time.time()
+        print(f"Time to train model {m}: {end - start}")
+
         # Test the model
         test(m)
 
