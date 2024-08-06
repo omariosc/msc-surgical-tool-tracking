@@ -19,8 +19,8 @@ dataset_path = "data/6DOF/"
 # Create a configuration file for YOLOv10
 config_content = f"""
 datasets:
-train: ../{dataset_path}/images/test
-val: ../data/ART-Net/images/val
+train: ../{dataset_path}/images/train
+val: ../{dataset_path}/images/test
 
 nc: 2  # number of classes
 names: ['tool', 'tip']  # class names
@@ -43,7 +43,7 @@ config_path = "yaml/6DOF Single Class.yaml"
 def train(n):
     # Load a pre-trained YOLOv8 model
     # model = YOLO("chkpts/YOLOv8/yolov8x-seg.pt")
-    model = YOLOv10(f"chkpts/ART/v10{n}/yolov10{n}-detect-art/weights/best.pt")
+    model = YOLOv10(f"chkpts/ART-Net/v10{n}/yolov10{n}-detect-art/weights/best.pt")
     # model = YOLOv10(f"chkpts/ART/yolov10{n}-detect-art/weights/last.pt")
     # Put model on GPU
     model.to(device)
