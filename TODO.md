@@ -10,8 +10,8 @@
 | 6 | Sat 3rd Aug | ~~Partially labelled video 5.~~ |
 | 7 | Sun 4th Aug | ~~Partially labelled video 5.~~ |
 | 8 | Mon 5th Aug | ~~Fully labelled video 5. Ideally, out of 24 videos (107,698 images), we will have 23 semi-labelled with 1 image (1% labelled data) every 100 frames (1,048 total images), where we can employ a cross-validation split of ~80/20 (839/209) and a 2680-image test set (1 video exclusive for testing, completely labelled so that we can evaluate the model on unseen data and be confident in the result and see difference temporally).~~ |
-| 9 | Tues 6th Aug | Finish labelling the training set. Apply the YOLO model as the anchor-based approach and the ART-Net method as the anchor-free approach (SIMO) to the in-house dataset. Also perform some CV techniques to help extract the tool, e.g. background removal, test with different losses and base architecture models (ResNet instead of VGG). The SIMO model needs to be evaluated on the test set with key metrics extracted, and videos made for the presentation. |
-| 10 | Wed 7th Aug | Ideally, development will be finished by this date, though models may still be training. |
+| 9 | Tues 6th Aug | ~~Finish labelling the training set. Apply the YOLO model as the anchor-based approach to the in-house dataset. Also perform some CV techniques to help extract the tool, e.g. background removal, test with different losses and base architecture models (ResNet instead of VGG).~~ |
+| 10 | Wed 7th Aug | Ideally, development will be finished by this date, though models may still be training. The SIMO (anchor-free model) needs to be trained on the in-house dataset and evaluated on the test set with key metrics extracted, and videos made for the presentation. |
 | 11 | Thurs 8th Aug | Begin writing the report with a draft abstract. |
 | 12 | Fri 9th Aug | Introduction. |
 | 13 | Sat 10th Aug | Introduction. |
