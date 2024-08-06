@@ -76,6 +76,8 @@ def process(input_dir, output_label_dir, output_image_dir):
                 # Make sure none of them are [], null or None
                 if all(left_tool_coords):
                     left_exists = True
+                    # Convert to YOLO format
+                    left_tool_yolo = create_yolo_format(left_tool_coords, img_width, img_height)
             except:
                 print(f"{filename} has missing left tool coordinates")
             try:
@@ -88,14 +90,11 @@ def process(input_dir, output_label_dir, output_image_dir):
                 # Make sure none of them are [], null or None
                 if all(right_tool_coords):
                     right_exists = True
+                    right_tool_yolo = create_yolo_format(
+                        right_tool_coords, img_width, img_height
+                    )
             except:
                 print(f"{filename} has missing right tool coordinates")
-
-            # Convert to YOLO format
-            left_tool_yolo = create_yolo_format(left_tool_coords, img_width, img_height)
-            right_tool_yolo = create_yolo_format(
-                right_tool_coords, img_width, img_height
-            )
 
             # Create output filename and path
             base_filename = os.path.splitext(filename)[0]
@@ -125,8 +124,8 @@ def process(input_dir, output_label_dir, output_image_dir):
             png_path = os.path.join(input_dir, f"{base_filename}.png")
             new_png_path = os.path.join(output_image_dir, f"{base_filename}.png")
 
-            # if os.path.exists(png_path):
-                # os.rename(png_path, new_png_path)
+            if os.path.exists(png_path):
+                os.rename(png_path, new_png_path)
 
 
 if __name__ == "__main__":
@@ -148,6 +147,6 @@ if __name__ == "__main__":
         os.makedirs(output_label_dir)
 
     check_nulls(input_dir, original_dir)
-    # process(input_dir, output_label_dir, output_image_dir)
+    process(input_dir, output_label_dir, output_image_dir)
 
     print("Processing completed.")
