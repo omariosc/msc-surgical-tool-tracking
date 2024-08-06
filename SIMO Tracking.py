@@ -197,6 +197,7 @@ class SIMOModel(nn.Module):
     def train_model(
         self, train_loader, val_loader, num_epochs=300, lr=0.001, patience=3
     ):
+        initial_patience = patience
         start_time = time.time()
         total_time = 0
         self.to(device)
@@ -250,10 +251,12 @@ class SIMOModel(nn.Module):
             val_losses.append(avg_val_loss)
             print(f"Epoch {epoch+1}/{num_epochs}, Validation Loss: {avg_val_loss}")
 
+            torch.save(self.state_dict(), f"{checkpoints_folder}/{epoch}.pt")
+
             if avg_val_loss < best_val_loss:
                 best_val_loss = avg_val_loss
                 torch.save(self.state_dict(), f"{checkpoints_folder}/best.pt")
-                patience = 10
+                patience = initial_patience
             else:
                 patience -= 1
                 if patience == 0:
@@ -354,10 +357,12 @@ class SIMOModel(nn.Module):
 
         fig, ax = plt.subplots()
         plt.axis("off")
-        ax.imshow(image)
 
         tool_x, tool_y, tool_w, tool_h = tool_preds
         tooltip_x, tooltip_y, tooltip_w, tooltip_h = tooltip_preds
+        
+        # print(tool_x, tool_y, tool_w, tool_h)
+        # print(tooltip_x, tooltip_y, tooltip_w, tooltip_h)
 
         tool_rect = matplotlib.patches.Rectangle(
             (tool_x, tool_y), tool_w, tool_h, edgecolor="r", facecolor="none"
@@ -373,10 +378,13 @@ class SIMOModel(nn.Module):
         ax.add_patch(tool_rect)
         ax.add_patch(tooltip_rect)
 
+        ax.imshow(image)
         if save_path:
             plt.savefig(save_path)
         else:
-            plt.show()
+            ax.imshow(image)
+        
+        plt.close()
 
     def track_on_images(self, image_folder, save_folder="chkpts/SIMO/tracking"):
         if not os.path.exists(image_folder):
@@ -526,14 +534,15 @@ class SIMOModel(nn.Module):
 
     def validate_on_images(self, val_images):
         self.eval()
-        for val_image in val_images:
-            image = Image.open(val_image)
-            image = functional.to_tensor(image)
-            image = functional.resize(image, (512, 512))
-            image = image.unsqueeze(0).to(device)
+        with torch.no_grad():
+            for val_image in val_images:
+                image = Image.open(val_image)
+                image = functional.to_tensor(image)
+                image = functional.resize(image, (512, 512))
+                image = image.unsqueeze(0).to(device)
 
-            tool_preds, tool_conf, tooltip_preds, tooltip_conf = self.forward(image)
-            self.visualize_bounding_boxes(image, tool_preds, tooltip_preds)
+                tool_preds, tool_conf, tooltip_preds, tooltip_conf = self.forward(image)
+                self.visualize_bounding_boxes(image, tool_preds, tooltip_preds)
 
 
 # Define the ObjectTracker class
@@ -727,18 +736,18 @@ def main():
 
     model = SIMOModel(n_classes=4, backbone="resnet", use_focal_loss=True).to(device)
 
-    model.train_model(train_loader, val_loader, num_epochs=300, lr=0.001, patience=3)
+    # model.train_model(train_loader, val_loader, num_epochs=300, lr=0.001, patience=3)
 
     # Load best weights and run evaluation on validation set
     model.load_best_weights()
     val_images = [
-        "data/ART-Net/images/val/Train_Pos_sample_0001.png",
-        "data/ART-Net/images/val/Train_Neg_sample_0002.png",
+        "data/ART-Net/images/train/Train_Pos_sample_0001.png",
+        "data/ART-Net/images/train/Train_Neg_sample_0002.png",
     ]
     model.validate_on_images(val_images)
-    model.run_on_test_images(
-        test_image_folder="data/ART-Net/images/val", num_pos=20, num_neg=5
-    )
+    # model.run_on_test_images(
+    #     test_image_folder="data/ART-Net/images/val", num_pos=20, num_neg=5
+    # )
 
 
 if __name__ == "__main__":
