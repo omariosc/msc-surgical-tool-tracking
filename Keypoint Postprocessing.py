@@ -20,14 +20,20 @@ def create_yolo_format(coords, img_width, img_height):
 
 def check_nulls(input_dir, original_dir):
     # Iterate over all JSON files in the directory
-    for filename in os.listdir(input_dir):
+    count = 0
+    files = os.listdir(input_dir)
+    # sort files by creation time
+    files.sort(key=lambda x: os.path.getctime(os.path.join(input_dir, x)))
+    for filename in files:
         if filename.endswith(".json"):
             # check if "null" is in the file contents
             with open(os.path.join(input_dir, filename), "r") as f:
                 contents = f.read()
                 if "null" in contents or "None" in contents or "[]" in contents:
                     print(f"Skipping {filename} due to null")
-
+                    count += 1
+                    # print the time created exactly
+                    continue
                     # Delete the seg png and json files
                     base_filename = os.path.splitext(filename)[0]
                     png_path = os.path.join(input_dir, f"{base_filename}_seg.png")
@@ -38,11 +44,14 @@ def check_nulls(input_dir, original_dir):
                         os.remove(json_path)
                     # Move original image to the original folder
                     os.rename(os.path.join(input_dir, f"{base_filename}.png"), os.path.join(original_dir, f"{base_filename}.png"))
+    print(f"Skipped {count} files due to null")
 
 
 def process(input_dir, output_label_dir, output_image_dir):
     # Iterate over all JSON files in the directory
     for filename in os.listdir(input_dir):
+        left_exists = False
+        right_exists = False
         if filename.endswith(".json"):
             json_path = os.path.join(input_dir, filename)
             print(f"Processing {json_path}")
@@ -51,7 +60,7 @@ def process(input_dir, output_label_dir, output_image_dir):
                 coords = data["tooltips"]
 
             # Delete the JSON file
-            os.remove(json_path)
+            # os.remove(json_path)
 
             # Assume image dimensions (this should be updated according to your real image size)
             img_width = 1920
@@ -64,15 +73,23 @@ def process(input_dir, output_label_dir, output_image_dir):
                     coords[1]["x"],
                     coords[1]["y"],
                 ]
+                # Make sure none of them are [], null or None
+                if all(left_tool_coords):
+                    left_exists = True
+            except:
+                print(f"{filename} has missing left tool coordinates")
+            try:
                 right_tool_coords = [
                     coords[2]["x"],
                     coords[2]["y"],
                     coords[3]["x"],
                     coords[3]["y"],
                 ]
+                # Make sure none of them are [], null or None
+                if all(right_tool_coords):
+                    right_exists = True
             except:
-                print(f"Skipping {filename} due to missing coordinates")
-                continue
+                print(f"{filename} has missing right tool coordinates")
 
             # Convert to YOLO format
             left_tool_yolo = create_yolo_format(left_tool_coords, img_width, img_height)
@@ -87,12 +104,16 @@ def process(input_dir, output_label_dir, output_image_dir):
 
             # Overwrite the existing file if exists
             with open(output_path, "w") as f:
-                f.write(
-                    f"0 {left_tool_yolo[0]} {left_tool_yolo[1]} {left_tool_yolo[2]} {left_tool_yolo[3]}\n"
-                )
-                f.write(
-                    f"0 {right_tool_yolo[0]} {right_tool_yolo[1]} {right_tool_yolo[2]} {right_tool_yolo[3]}\n"
-                )
+                if left_exists:
+                    f.write(
+                        f"0 {left_tool_yolo[0]} {left_tool_yolo[1]} {left_tool_yolo[2]} {left_tool_yolo[3]}\n"
+                    )
+                    left_exists = False
+                if right_exists:
+                    f.write(
+                        f"0 {right_tool_yolo[0]} {right_tool_yolo[1]} {right_tool_yolo[2]} {right_tool_yolo[3]}\n"
+                    )
+                    right_exists = False
 
             # Remove the corresponding PNG file
             png_filename = f"{base_filename}_seg.png"
@@ -100,12 +121,12 @@ def process(input_dir, output_label_dir, output_image_dir):
             if os.path.exists(png_path):
                 os.remove(png_path)
 
-            # Rename the base_filename.png file to include the "test5_" prefix
+            # Rename the base_filename.png file
             png_path = os.path.join(input_dir, f"{base_filename}.png")
             new_png_path = os.path.join(output_image_dir, f"{base_filename}.png")
 
-            if os.path.exists(png_path):
-                os.rename(png_path, new_png_path)
+            # if os.path.exists(png_path):
+                # os.rename(png_path, new_png_path)
 
 
 if __name__ == "__main__":
@@ -127,6 +148,6 @@ if __name__ == "__main__":
         os.makedirs(output_label_dir)
 
     check_nulls(input_dir, original_dir)
-    process(input_dir, output_label_dir, output_image_dir)
+    # process(input_dir, output_label_dir, output_image_dir)
 
     print("Processing completed.")
