@@ -1,8 +1,5 @@
-# python "SIMO Tracking.py" > chkpts/SIMO/results.txt
-
 import os
 import time
-from tracemalloc import start
 import cv2
 import json
 import torch
@@ -18,6 +15,7 @@ from torchvision.transforms import functional
 import torch.optim as optim
 from scipy.optimize import linear_sum_assignment
 from sklearn.metrics import precision_recall_curve, average_precision_score
+
 
 # Set device
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -35,7 +33,6 @@ class ToolDataset(Dataset):
             f
             for f in os.listdir(image_dir)
             if os.path.isfile(os.path.join(image_dir, f))
-            and not "Neg" in f
             and os.path.exists(os.path.join(label_dir, f.replace(".png", ".txt")))
             and os.path.getsize(os.path.join(label_dir, f.replace(".png", ".txt"))) > 1
         ]
@@ -90,6 +87,10 @@ class SIMOModel(nn.Module):
             backbone_out_channels = 2048
         else:
             raise ValueError("Invalid backbone. Choose 'vgg' or 'resnet'.")
+
+        # Freeze the backbone weights
+        for param in self.backbone.parameters():
+            param.requires_grad = False
 
         # Feature representation generator (FRG)
         self.frg = nn.Sequential(
@@ -242,7 +243,9 @@ class SIMOModel(nn.Module):
             train_losses.append(avg_train_loss)
             end_time = time.time()
             epoch_time = end_time - start_time
-            print(f"Epoch {epoch+1}/{num_epochs}, Train Loss: {avg_train_loss} in {epoch_time:.2f} seconds")
+            print(
+                f"Epoch {epoch+1}/{num_epochs}, Train Loss: {avg_train_loss} in {epoch_time:.2f} seconds"
+            )
 
             total_time += epoch_time
             start_time = end_time
@@ -275,8 +278,8 @@ class SIMOModel(nn.Module):
                 images = images.to(device).float()
                 tool_labels = labels[:, 0, 1:].to(device).float()
                 tooltip_labels = labels[:, 1, 1:].to(device).float()
-                tool_targets = labels[:, 0, 0].unsqueeze(1).to(device).float()
-                tooltip_targets = labels[:, 1, 0].unsqueeze(1).to(device).float()
+                tool_targets = labels[:, 0, 0].unsqueeze(2).to(device).float()
+                tooltip_targets = labels[:, 1, 0].unsqueeze(2).to(device).float()
 
                 tool_preds, tool_conf, tooltip_preds, tooltip_conf = self.forward(
                     images
@@ -293,7 +296,9 @@ class SIMOModel(nn.Module):
                 val_loss += loss.item()
 
         end_time = time.time()
-        print(f"Time per image: {(end_time - start_time) / len(val_loader):.2f} seconds")  
+        print(
+            f"Time per image: {(end_time - start_time) / len(val_loader):.2f} seconds"
+        )
 
         return val_loss / len(val_loader)
 
@@ -360,9 +365,6 @@ class SIMOModel(nn.Module):
 
         tool_x, tool_y, tool_w, tool_h = tool_preds
         tooltip_x, tooltip_y, tooltip_w, tooltip_h = tooltip_preds
-        
-        # print(tool_x, tool_y, tool_w, tool_h)
-        # print(tooltip_x, tooltip_y, tooltip_w, tooltip_h)
 
         tool_rect = matplotlib.patches.Rectangle(
             (tool_x, tool_y), tool_w, tool_h, edgecolor="r", facecolor="none"
@@ -383,7 +385,7 @@ class SIMOModel(nn.Module):
             plt.savefig(save_path)
         else:
             ax.imshow(image)
-        
+
         plt.close()
 
     def track_on_images(self, image_folder, save_folder="chkpts/SIMO/tracking"):
@@ -628,25 +630,6 @@ def bce_iou_loss(pred, target):
     return (bce_loss.mean() + iou_loss_value.mean()).mean()
 
 
-def preprocess_background(image1, image2):
-    # Convert to grayscale
-    gray1 = cv2.cvtColor(image1, cv2.COLOR_BGR2GRAY)
-    gray2 = cv2.cvtColor(image2, cv2.COLOR_BGR2GRAY)
-
-    # Calculate absolute difference between images
-    diff = cv2.absdiff(gray1, gray2)
-
-    # Threshold the difference image
-    _, thresh = cv2.threshold(diff, 30, 255, cv2.THRESH_BINARY)
-
-    # Optionally, dilate the thresholded image to fill gaps
-    kernel = np.ones((5, 5), np.uint8)
-    dilated = cv2.dilate(thresh, kernel, iterations=2)
-
-    # Return the segmentation map (background removal)
-    return dilated
-
-
 class FocalLoss(nn.Module):
     def __init__(self, alpha=1, gamma=2):
         super(FocalLoss, self).__init__()
@@ -717,7 +700,100 @@ def compute_metrics(pred_boxes, true_boxes, conf_scores, iou_threshold=0.5):
     return precisions, recalls, ap50, mAP_50_95
 
 
+def preprocess_background(image1, image2):
+    # Convert to grayscale
+    gray1 = cv2.cvtColor(image1, cv2.COLOR_BGR2GRAY)
+    gray2 = cv2.cvtColor(image2, cv2.COLOR_BGR2GRAY)
+
+    # Apply Gaussian blur to both images to reduce noise
+    gray1 = cv2.GaussianBlur(gray1, (5, 5), 0)
+    gray2 = cv2.GaussianBlur(gray2, (5, 5), 0)
+
+    # Calculate absolute difference between images
+    diff = cv2.absdiff(gray1, gray2)
+
+    # Threshold the difference image
+    _, thresh = cv2.threshold(diff, 10, 255, cv2.THRESH_BINARY)
+
+    # Remove isolated pixels not in connected regions
+    connectivity = 8
+    num_labels, labels, stats, centroids = cv2.connectedComponentsWithStats(
+        thresh, connectivity, cv2.CV_32S
+    )
+    sizes = stats[1:, -1]  # Sizes of connected components, ignoring the background
+    min_size = 50  # Minimum size of connected component to keep
+
+    # Create mask to remove small components
+    mask = np.zeros_like(thresh)
+    for i in range(1, num_labels):
+        if sizes[i - 1] >= min_size:
+            mask[labels == i] = 255
+
+    # Dilate the remaining components to fill gaps
+    kernel = np.ones((5, 5), np.uint8)
+    dilated = cv2.dilate(mask, kernel, iterations=2)
+
+    # Now using dilated as a map, darken all pixels in image2 to 0.3 times their value not in dilated
+    background = image2.copy()
+    for i in range(3):
+        background[:, :, i] = np.where(
+            dilated == 255, image2[:, :, i], 0.3 * image2[:, :, i]
+        )
+
+    return background
+
+
+def process_images(input_dir, output_dir, label_dir, output_dir_labels):
+    # Make sure the output directory exists
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
+    if not os.path.exists(output_dir_labels):
+        os.makedirs(output_dir_labels)
+
+    # Get the list of image files, sorted based on number (test5_1, test5_2, ...)
+    image_files = sorted(
+        os.listdir(input_dir), key=lambda x: int(x.split("_")[-1].split(".")[0])
+    )
+
+    # Iterate over pairs of images (assuming each pair is consecutive in the sorted list)
+    for i in range(1, len(image_files)):
+        image1_path = os.path.join(input_dir, image_files[i - 1])
+        image2_path = os.path.join(input_dir, image_files[i])
+
+        image1 = cv2.imread(image1_path)
+        image2 = cv2.imread(image2_path)
+
+        # Preprocess and remove the background
+        processed_image = preprocess_background(image1, image2)
+
+        # Save the processed image
+        output_path = os.path.join(output_dir, f"processed_{image_files[i]}")
+        cv2.imwrite(output_path, processed_image)
+
+        # There is a label file with same name as image in label_dir, copy it to output_dir_labels with same name as processed image
+        label_path = os.path.join(label_dir, image_files[i].replace(".png", ".txt"))
+        output_label_path = os.path.join(
+            output_dir_labels, f"processed_{image_files[i].replace('.png', '.txt')}"
+        )
+        with open(label_path, "r") as f:
+            lines = f.readlines()
+        with open(output_label_path, "w") as f:
+            f.writelines(lines)
+
+        print(f"Processed {image_files[i]}")
+
+    print(
+        f"Processing complete. Processed images saved in {output_dir} and labels in {output_dir_labels}"
+    )
+
+
 def main():
+    # process_images(
+    #     "data/6DOF/images/val",
+    #     "data/6DOF/processed_images/val",
+    #     "data/6DOF/labels/val",
+    #     "data/6DOF/processed_labels/val",
+    # )
     transform = transforms.Compose([transforms.ToTensor()])
 
     train_dataset = ToolDataset(
@@ -734,17 +810,23 @@ def main():
     train_loader = DataLoader(train_dataset, batch_size=8, shuffle=True)
     val_loader = DataLoader(val_dataset, batch_size=8, shuffle=False)
 
-    model = SIMOModel(n_classes=4, backbone="resnet", use_focal_loss=True).to(device)
+    # Test getting the first image
+    for images, labels in train_loader:
+        print(images[0].shape)
+        print(labels[0])
+        break
 
-    # model.train_model(train_loader, val_loader, num_epochs=300, lr=0.001, patience=3)
+    model = SIMOModel(n_classes=4, backbone="vgg", use_focal_loss=False).to(device)
 
-    # Load best weights and run evaluation on validation set
-    model.load_best_weights()
-    val_images = [
-        "data/ART-Net/images/train/Train_Pos_sample_0001.png",
-        "data/ART-Net/images/train/Train_Neg_sample_0002.png",
-    ]
-    model.validate_on_images(val_images)
+    model.train_model(train_loader, val_loader, num_epochs=300, lr=0.001, patience=10)
+
+    # # Load best weights and run evaluation on validation set
+    # model.load_best_weights()
+    # val_images = [
+    #     "data/ART-Net/images/train/Train_Pos_sample_0001.png",
+    #     "data/ART-Net/images/train/Train_Neg_sample_0002.png",
+    # ]
+    # model.validate_on_images(val_images)
     # model.run_on_test_images(
     #     test_image_folder="data/ART-Net/images/val", num_pos=20, num_neg=5
     # )
