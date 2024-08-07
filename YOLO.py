@@ -63,32 +63,9 @@ def train(n):
         save_txt=True,
         optimize=True,
         amp=True,
-        patience=10,
+        patience=5,  # initially 10
         save_period=1,
     )
-
-    # Save the model checkpoint to a file
-    # checkpoint = model.save("chkpts/ART/yolov10{n}-detect-art/1.pt")
-
-    # Train the model for more epochs
-    # model = YOLO("chkpts/ART/yolov8x-semiseg-artnet.pt")
-
-    # model.train(
-    #     data=config_path_combined,
-    #     epochs=50,
-    #     imgsz=640,
-    #     # resume=True,
-    #     single_cls=True,
-    #     save_dir="chkpts/combined",
-    #     project="chkpts/combined",
-    #     name="yolov8x-semiseg-combined",
-    #     save_conf=True,
-    #     save_crop=True,
-    #     optimize=True,
-    #     amp=True,
-    #     patience=10,
-    #     save_period=1,
-    # )
 
 
 def test(n):
@@ -99,38 +76,63 @@ def test(n):
 
     model.track(
         # "D:\Data\RARP-45_train/train\Log_D2P280782_2017.11.20_12.20.03_4\DVC\EndoscopeImageMemory_0_sync.avi",
-        # "D:\Data\PETRAW\Test\Video\/054.mp4",
-        "data/6DOF/Dataset.mp4",
+        "data\EndoVis 2015\Robotic Testing 1.avi",
+        # "data/6DOF/Dataset.mp4",
         tracker="bytetrack.yaml",
         save=True,
         show=False,
+        save_dir=f"chkpts/ART/v10{n}",
+        stream=True,
     )
 
+    # model.track(
+    #     # "D:\Data\RARP-45_train/train\Log_D2P280782_2017.11.20_12.20.03_4\DVC\EndoscopeImageMemory_0_sync.avi",
+    #     "data/6DOF/Test 5 Labelled.mp4",
+    #     # "data/6DOF/Dataset.mp4",
+    #     tracker="bytetrack.yaml",
+    #     save=True,
+    #     show=False,
+    #     save_dir=f"chkpts/ART/v10{n}",
+    #     stream=True,
+    # )
+
+    for i in range (1,7):
+        model.track(
+            f"data\EndoVis 2015\Tracking Rigid Testing Revision {i}.mp4",
+            tracker="bytetrack.yaml",
+            save=True,
+            show=False,
+            save_dir=f"chkpts/ART/v10{n}",
+            stream=True,
+        )
 
 if __name__ == "__main__":
     freeze_support()
 
-    models = ["n", "s", "m", "b", "l", "x"]
+    # models = ["n", "s", "m", "b", "l", "x"]
 
-    for m in models:
+    # for m in models:
 
-        # Save output to a file
-        orig_stdout = sys.stdout
-        f = open(f"chkpts/ART/v10{m}/yolov10{m}-code-out.txt", "w")
-        sys.stdout = f
+    m = sys.argv[1]
+    # Save output to a file
+    orig_stdout = sys.stdout
+    f = open(f"chkpts/ART/v10{m}/yolov10{m}-code-out.txt", "w")
+    sys.stdout = f
 
-        # Log time to train
-        print(f"Training model {m}")
-        start = time.time()
+    # Log time to train
+    print(f"Training model {m}")
+    start = time.time()
+    # Train the model
+    train(m)
+    end = time.time()
+    print(f"Time to train model {m}: {end - start}")
 
-        # Train the model
-        train(m)
-        
-        end = time.time()
-        print(f"Time to train model {m}: {end - start}")
+    print(f"Testing model {m}")
+    start = time.time()
+    # Test the model
+    test(m)
+    end = time.time()
+    print(f"Time to test model {m}: {end - start}")
 
-        # Test the model
-        test(m)
-
-        sys.stdout = orig_stdout
-        f.close()
+    sys.stdout = orig_stdout
+    f.close()
