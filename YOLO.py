@@ -71,8 +71,8 @@ def train(n):
 def test(n):
     model = YOLOv10(f"chkpts/ART/v10{n}/yolov10{n}-detect-art/weights/best.pt")
     model.to(device)
-    results = model.val(data=config_path)
-    print(results.results_dict)
+    # results = model.val(data=config_path)
+    # print(results.results_dict)
 
     model.track(
         # "D:\Data\RARP-45_train/train\Log_D2P280782_2017.11.20_12.20.03_4\DVC\EndoscopeImageMemory_0_sync.avi",
@@ -81,8 +81,8 @@ def test(n):
         tracker="bytetrack.yaml",
         save=True,
         show=False,
-        save_dir=f"chkpts/ART/v10{n}",
-        stream=True,
+        # save_dir=f"chkpts/ART/v10{n}",
+        # stream=True,
     )
 
     # model.track(
@@ -102,8 +102,8 @@ def test(n):
             tracker="bytetrack.yaml",
             save=True,
             show=False,
-            save_dir=f"chkpts/ART/v10{n}",
-            stream=True,
+            # save_dir=f"chkpts/ART/v10{n}",
+            # stream=True,
         )
 
 if __name__ == "__main__":
@@ -120,12 +120,12 @@ if __name__ == "__main__":
     sys.stdout = f
 
     # Log time to train
-    print(f"Training model {m}")
-    start = time.time()
+    # print(f"Training model {m}")
+    # start = time.time()
     # Train the model
-    train(m)
-    end = time.time()
-    print(f"Time to train model {m}: {end - start}")
+    # train(m)
+    # end = time.time()
+    # print(f"Time to train model {m}: {end - start}")
 
     print(f"Testing model {m}")
     start = time.time()

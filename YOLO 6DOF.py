@@ -54,7 +54,7 @@ def train(n):
         epochs=300,
         imgsz=640,
         # resume=True,
-        single_cls=True,
+        # single_cls=True,
         save_dir=f"chkpts/6DOF/v10{n}",
         project=f"chkpts/6DOF/v10{n}",
         name=f"yolov10{n}-detect-6dof",
@@ -80,19 +80,19 @@ def test(n):
         tracker="bytetrack.yaml",
         save=True,
         show=False,
-        save_dir=f"chkpts/6DOF/v10{n}",
-        stream=True,
+        # save_dir=f"chkpts/6DOF/v10{n}",
+        # stream=True,
     )
 
     model.track(
         # "D:\Data\RARP-45_train/train\Log_D2P280782_2017.11.20_12.20.03_4\DVC\EndoscopeImageMemory_0_sync.avi",
-        "data/6DOF/Test 5 Labelled.mp4",
+        "data/6DOF/Test 5 Labelled (Tips).mp4",
         # "data/6DOF/Dataset.mp4",
         tracker="bytetrack.yaml",
         save=True,
         show=False,
-        save_dir=f"chkpts/ART/v10{n}",
-        stream=True,
+        # save_dir=f"chkpts/ART/v10{n}",
+        # stream=True,
     )
 
 
