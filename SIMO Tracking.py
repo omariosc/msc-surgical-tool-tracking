@@ -114,8 +114,20 @@ class SIMOModel(nn.Module):
 
         combined_channels = backbone_out_channels + 512  # For concatenation
 
-        # Decoder for tool bounding box regression
-        self.tool_decoder = nn.Sequential(
+        # Decoder for tool and tooltip bounding box regression
+        self.tool_1_decoder = self._create_decoder(combined_channels, n_classes)
+        self.tool_2_decoder = self._create_decoder(combined_channels, n_classes)
+        self.tooltip_1_decoder = self._create_decoder(combined_channels, n_classes)
+        self.tooltip_2_decoder = self._create_decoder(combined_channels, n_classes)
+
+        # Confidence prediction for tool and tooltip
+        self.tool_1_confidence = self._create_confidence_head(combined_channels)
+        self.tool_2_confidence = self._create_confidence_head(combined_channels)
+        self.tooltip_1_confidence = self._create_confidence_head(combined_channels)
+        self.tooltip_2_confidence = self._create_confidence_head(combined_channels)
+
+    def _create_decoder(self, combined_channels, n_classes):
+        return nn.Sequential(
             nn.Conv2d(combined_channels, 512, kernel_size=3, padding=1),
             nn.ReLU(),
             nn.BatchNorm2d(512),
@@ -132,37 +144,8 @@ class SIMOModel(nn.Module):
             nn.Flatten(),  # Flatten to shape [batch_size, 4]
         )
 
-        # Decoder for tooltip bounding box regression
-        self.tooltip_decoder = nn.Sequential(
-            nn.Conv2d(combined_channels, 512, kernel_size=3, padding=1),
-            nn.ReLU(),
-            nn.BatchNorm2d(512),
-            nn.Conv2d(512, 256, kernel_size=3, padding=1),
-            nn.ReLU(),
-            nn.BatchNorm2d(256),
-            nn.Conv2d(256, 128, kernel_size=3, padding=1),
-            nn.ReLU(),
-            nn.BatchNorm2d(128),
-            nn.Conv2d(
-                128, n_classes, kernel_size=1
-            ),  # 4 outputs for bounding box coordinates
-            nn.AdaptiveAvgPool2d((1, 1)),  # Pooling to get a 1x1 output
-            nn.Flatten(),  # Flatten to shape [batch_size, 4]
-        )
-
-        # Confidence prediction for tool
-        self.tool_confidence = nn.Sequential(
-            nn.Conv2d(combined_channels, 256, kernel_size=3, padding=1),
-            nn.ReLU(),
-            nn.BatchNorm2d(256),
-            nn.Conv2d(256, 1, kernel_size=1),
-            nn.AdaptiveAvgPool2d((1, 1)),
-            nn.Flatten(),
-            nn.Sigmoid(),  # Confidence between 0 and 1
-        )
-
-        # Confidence prediction for tooltip
-        self.tooltip_confidence = nn.Sequential(
+    def _create_confidence_head(self, combined_channels):
+        return nn.Sequential(
             nn.Conv2d(combined_channels, 256, kernel_size=3, padding=1),
             nn.ReLU(),
             nn.BatchNorm2d(256),
@@ -189,19 +172,27 @@ class SIMOModel(nn.Module):
         # Concatenate backbone and FRG outputs
         combined_features = torch.cat((x_backbone, frg_resized), dim=1)
 
-        # Decoder for tool and tooltip
-        tool_output = self.tool_decoder(combined_features)
-        tooltip_output = self.tooltip_decoder(combined_features)
+        # Decoders for tools and tooltips
+        tool_1_pred = self.tool_1_decoder(combined_features)
+        tool_2_pred = self.tool_2_decoder(combined_features)
+        tooltip_1_pred = self.tooltip_1_decoder(combined_features)
+        tooltip_2_pred = self.tooltip_2_decoder(combined_features)
 
         # Confidence predictions
-        tool_conf = self.tool_confidence(combined_features)
-        tooltip_conf = self.tooltip_confidence(combined_features)
+        tool_1_conf = self.tool_1_confidence(combined_features)
+        tool_2_conf = self.tool_2_confidence(combined_features)
+        tooltip_1_conf = self.tooltip_1_confidence(combined_features)
+        tooltip_2_conf = self.tooltip_2_confidence(combined_features)
 
-        return tool_output, tool_conf, tooltip_output, tooltip_conf
+        return (
+            tool_1_pred, tool_1_conf,
+            tool_2_pred, tool_2_conf,
+            tooltip_1_pred, tooltip_1_conf,
+            tooltip_2_pred, tooltip_2_conf
+        )
 
-    def train_model(
-        self, train_loader, val_loader, num_epochs=300, lr=0.001, patience=3
-    ):
+
+    def train_model(self, train_loader, val_loader, num_epochs=300, lr=0.001, patience=3):
         torch.cuda.empty_cache()
         torch.cuda.empty_cache()
 
@@ -222,35 +213,33 @@ class SIMOModel(nn.Module):
             running_loss = 0.0
             for batch, (images, labels) in enumerate(train_loader):
                 images = images.to(device).float()
-                tool_labels, tooltip_labels = labels[:, :2, 1:], labels[:, 2:, 1:]
-                tool_targets, tooltip_targets = labels[:, :2, 0].unsqueeze(2), labels[
-                    :, 2:, 0
-                ].unsqueeze(2)
 
+                # Split labels for tools and tooltips
+                tool_labels, tooltip_labels = labels[:, :2, :], labels[:, 2:, :]
                 tool_labels = tool_labels.to(device).float()
                 tooltip_labels = tooltip_labels.to(device).float()
-                tool_targets = tool_targets.to(device).float()
-                tooltip_targets = tooltip_targets.to(device).float()
 
                 optimizer.zero_grad()
-                tool_preds, tool_conf, tooltip_preds, tooltip_conf = self.forward(
-                    images
-                )
 
-                loss_tool, conf_loss_tool = self.compute_losses(
-                    tool_preds, tool_labels, tool_conf, tool_targets
-                )
-                loss_tooltip, conf_loss_tooltip = self.compute_losses(
-                    tooltip_preds, tooltip_labels, tooltip_conf, tooltip_targets
-                )
+                preds = self.forward(images)
 
-                loss = loss_tool + loss_tooltip + conf_loss_tool + conf_loss_tooltip
+                # The preds list has the order:
+                # [tool_1_pred, tool_1_conf, tool_2_pred, tool_2_conf, tooltip_1_pred, tooltip_1_conf, tooltip_2_pred, tooltip_2_conf]
+                loss = self.compute_losses(
+                    preds,
+                    [
+                        tool_labels[:, 0],
+                        tool_labels[:, 1],
+                        tooltip_labels[:, 0],
+                        tooltip_labels[:, 1],
+                    ],
+                )
                 loss = loss.mean()
 
                 loss.backward()
                 optimizer.step()
                 running_loss += loss.item()
-                
+
                 print(f"Batch {batch+1}/{len(train_loader)}, Loss: {loss.item()}")
                 torch.cuda.empty_cache()
                 torch.cuda.empty_cache()
@@ -262,6 +251,7 @@ class SIMOModel(nn.Module):
 
             total_time += epoch_time
             start_time = end_time
+
             avg_val_loss = self.validate_model(val_loader)
             val_losses.append(avg_val_loss)
 
@@ -295,6 +285,8 @@ class SIMOModel(nn.Module):
         with torch.no_grad():
             for images, labels in val_loader:
                 images = images.to(device).float()
+
+                # Split labels for tools and tooltips
                 tool_labels, tooltip_labels = labels[:, :2, 1:], labels[:, 2:, 1:]
                 tool_targets, tooltip_targets = labels[:, :2, 0].unsqueeze(2), labels[:, 2:, 0].unsqueeze(2)
 
@@ -303,38 +295,50 @@ class SIMOModel(nn.Module):
                 tool_targets = tool_targets.to(device).float()
                 tooltip_targets = tooltip_targets.to(device).float()
 
-                tool_preds, tool_conf, tooltip_preds, tooltip_conf = self.forward(images)
+                preds = self.forward(images)
 
-                loss_tool, conf_loss_tool = self.compute_losses(tool_preds, tool_labels, tool_conf, tool_targets)
-                loss_tooltip, conf_loss_tooltip = self.compute_losses(tooltip_preds, tooltip_labels, tooltip_conf, tooltip_targets)
-
-                loss = loss_tool + loss_tooltip + conf_loss_tool + conf_loss_tooltip
+                loss = self.compute_losses(
+                    preds,
+                    [
+                        tool_labels[:, 0],
+                        tool_labels[:, 1],
+                        tooltip_labels[:, 0],
+                        tooltip_labels[:, 1],
+                    ],
+                )
                 val_loss += loss.item()
 
             torch.cuda.empty_cache()
             torch.cuda.empty_cache()
 
         end_time = time.time()
-        print(
-            f"Time per image: {(end_time - start_time) / len(val_loader):.2f} seconds"
-        )
+        print(f"Time per image: {(end_time - start_time) / len(val_loader):.2f} seconds")
 
         return val_loss / len(val_loader)
 
-    def compute_losses(self, preds, labels, conf, targets):
-        if labels.size(0) > 0:
-            loss = bce_iou_loss(preds, labels)
+    def compute_losses(self, preds, labels):
+        total_loss = 0.0
+        
+        for i in range(4):  # Iterating over each tool and tooltip (total 4)
+            pred_bbox = preds[i*2]     # Bbox prediction (tool_1_pred, tool_2_pred, ...)
+            pred_conf = preds[i*2 + 1] # Conf prediction (tool_1_conf, tool_2_conf, ...)
+            
+            label_bbox = labels[i][:, 1:]  # Bounding box label
+            label_conf = labels[i][:, 0].unsqueeze(1)  # Confidence label (reshaped to match pred_conf)
+            
+            # Compute IoU loss
+            iou_loss_value = iou_loss(pred_bbox, label_bbox)
+            
+            # Compute Confidence loss
             if self.use_focal_loss:
-                conf_loss = focal_loss(conf, targets)
+                conf_loss_value = focal_loss(pred_conf, label_conf)
             else:
-                conf_loss = F.binary_cross_entropy_with_logits(conf, targets)
-        else:
-            conf_loss = F.binary_cross_entropy_with_logits(
-                conf, torch.zeros_like(conf, device=device)
-            )
-            loss = torch.tensor(0.0, device=device)
+                conf_loss_value = F.binary_cross_entropy_with_logits(pred_conf, label_conf)
 
-        return loss, conf_loss
+            total_loss += iou_loss_value + conf_loss_value
+
+        return total_loss
+
 
     def compute_metrics(
         self,
@@ -639,14 +643,40 @@ def iou(pred, target, smooth=1e-6):
     return (intersection + smooth) / (union + smooth)
 
 
-def iou_loss(pred, target):
-    return 1 - iou(pred, target)
+def iou_loss(preds, labels):
+    """
+    Custom loss function to handle different sized predictions and labels.
+    Penalizes for missing predictions, unmatched labels, and negative predictions.
 
+    Args:
+        preds: Tensor of predicted bounding boxes and confidences [batch_size, 4].
+        labels: Tensor of ground truth bounding boxes and confidences [batch_size, 4].
 
-def bce_iou_loss(pred, target):
-    bce_loss = F.binary_cross_entropy_with_logits(pred, target, reduction="none")
-    iou_loss_value = iou(torch.sigmoid(pred), target)
-    return (bce_loss.mean() + iou_loss_value.mean()).mean()
+    Returns:
+        loss: Computed loss value.
+    """
+    (
+        tool_1_pred,
+        tool_1_conf,
+        tool_2_pred,
+        tool_2_conf,
+        tooltip_1_pred,
+        tooltip_1_conf,
+        tooltip_2_pred,
+        tooltip_2_conf,
+    ) = preds
+
+    total_iou_loss = 0.0
+
+    for pred, label in zip(preds, labels):
+        if label.size(0) > 0:
+            iou_loss = 1 - iou(pred, label)
+        else:
+            iou_loss = torch.tensor(0.0, device=device)
+
+        total_iou_loss += iou_loss
+        
+    return total_iou_loss
 
 
 class FocalLoss(nn.Module):
