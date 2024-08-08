@@ -26,11 +26,11 @@ nc: 2  # number of classes
 names: ['tool', 'tip']  # class names
 """
 
-config_path = os.path.join("yaml/6DOF Single Class.yaml")
+config_path = os.path.join("yaml/6DOF Multiclass.yaml")
 with open(config_path, "w") as file:
     file.write(config_content)
 
-config_path = "yaml/6DOF Single Class.yaml"
+config_path = "yaml/6DOF Multiclass.yaml"
 # config_path_test = os.path.join(dataset_path, "data-small-test.yaml")
 # config_path_final = os.path.join(dataset_path, "data-small-final.yaml")
 # config_path_combined = os.path.join("yaml/data-combined.yaml")
