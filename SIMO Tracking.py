@@ -34,7 +34,6 @@ class ToolDataset(Dataset):
             for f in os.listdir(image_dir)
             if os.path.isfile(os.path.join(image_dir, f))
             and os.path.exists(os.path.join(label_dir, f.replace(".png", ".txt")))
-            and os.path.getsize(os.path.join(label_dir, f.replace(".png", ".txt"))) > 1
         ]
 
     def __len__(self):
@@ -50,6 +49,7 @@ class ToolDataset(Dataset):
         image = cv2.resize(image, (512, 512))  # Resize images to 512x512
         image = image / 255.0
 
+        # Load labels and handle cases with empty or partial labels
         if os.path.exists(label_path) and os.path.getsize(label_path) > 0:
             labels = np.loadtxt(label_path, delimiter=" ")
             if labels.ndim == 1:
@@ -57,12 +57,8 @@ class ToolDataset(Dataset):
         else:
             labels = np.zeros((0, 5))  # No bounding boxes
 
-        # Pad labels to fixed size
-        if len(labels) > self.max_bboxes:
-            labels = labels[: self.max_bboxes]
-        else:
-            padding = np.zeros((self.max_bboxes - len(labels), 5))
-            labels = np.vstack((labels, padding))
+        # Pad labels to fixed size, ensuring 2 tools and 2 tool tips (4 total)
+        labels = self.pad_labels(labels, self.max_bboxes)
 
         labels = torch.tensor(labels, dtype=torch.float32)
 
@@ -70,6 +66,14 @@ class ToolDataset(Dataset):
             image = self.transform(image)
 
         return image, labels
+
+    def pad_labels(self, labels, max_bboxes):
+        if len(labels) > max_bboxes:
+            labels = labels[:max_bboxes]
+        else:
+            padding = np.zeros((max_bboxes - len(labels), 5))
+            labels = np.vstack((labels, padding))
+        return labels
 
 
 class SIMOModel(nn.Module):
@@ -198,6 +202,9 @@ class SIMOModel(nn.Module):
     def train_model(
         self, train_loader, val_loader, num_epochs=300, lr=0.001, patience=3
     ):
+        torch.cuda.empty_cache()
+        torch.cuda.empty_cache()
+
         initial_patience = patience
         start_time = time.time()
         total_time = 0
@@ -215,10 +222,15 @@ class SIMOModel(nn.Module):
             running_loss = 0.0
             for batch, (images, labels) in enumerate(train_loader):
                 images = images.to(device).float()
-                tool_labels = labels[:, 0, 1:].to(device).float()
-                tooltip_labels = labels[:, 1, 1:].to(device).float()
-                tool_targets = labels[:, 0, 0].unsqueeze(1).to(device).float()
-                tooltip_targets = labels[:, 1, 0].unsqueeze(1).to(device).float()
+                tool_labels, tooltip_labels = labels[:, :2, 1:], labels[:, 2:, 1:]
+                tool_targets, tooltip_targets = labels[:, :2, 0].unsqueeze(2), labels[
+                    :, 2:, 0
+                ].unsqueeze(2)
+
+                tool_labels = tool_labels.to(device).float()
+                tooltip_labels = tooltip_labels.to(device).float()
+                tool_targets = tool_targets.to(device).float()
+                tooltip_targets = tooltip_targets.to(device).float()
 
                 optimizer.zero_grad()
                 tool_preds, tool_conf, tooltip_preds, tooltip_conf = self.forward(
@@ -238,21 +250,24 @@ class SIMOModel(nn.Module):
                 loss.backward()
                 optimizer.step()
                 running_loss += loss.item()
+                
+                print(f"Batch {batch+1}/{len(train_loader)}, Loss: {loss.item()}")
+                torch.cuda.empty_cache()
+                torch.cuda.empty_cache()
 
             avg_train_loss = running_loss / len(train_loader)
             train_losses.append(avg_train_loss)
             end_time = time.time()
             epoch_time = end_time - start_time
-            print(
-                f"Epoch {epoch+1}/{num_epochs}, Train Loss: {avg_train_loss} in {epoch_time:.2f} seconds"
-            )
 
             total_time += epoch_time
             start_time = end_time
-
             avg_val_loss = self.validate_model(val_loader)
             val_losses.append(avg_val_loss)
-            print(f"Epoch {epoch+1}/{num_epochs}, Validation Loss: {avg_val_loss}")
+
+            print(
+                f"Epoch {epoch+1}/{num_epochs}, Train Loss: {avg_train_loss} in {epoch_time:.2f} seconds, Validation Loss: {avg_val_loss}"
+            )
 
             torch.save(self.state_dict(), f"{checkpoints_folder}/{epoch}.pt")
 
@@ -267,33 +282,37 @@ class SIMOModel(nn.Module):
                     break
 
         print(f"Total training time: {total_time:.2f} seconds")
+        torch.cuda.empty_cache()
+        torch.cuda.empty_cache()
+
         return train_losses, val_losses
 
     def validate_model(self, val_loader):
         self.eval()
         val_loss = 0.0
         start_time = time.time()
+
         with torch.no_grad():
             for images, labels in val_loader:
                 images = images.to(device).float()
-                tool_labels = labels[:, 0, 1:].to(device).float()
-                tooltip_labels = labels[:, 1, 1:].to(device).float()
-                tool_targets = labels[:, 0, 0].unsqueeze(2).to(device).float()
-                tooltip_targets = labels[:, 1, 0].unsqueeze(2).to(device).float()
+                tool_labels, tooltip_labels = labels[:, :2, 1:], labels[:, 2:, 1:]
+                tool_targets, tooltip_targets = labels[:, :2, 0].unsqueeze(2), labels[:, 2:, 0].unsqueeze(2)
 
-                tool_preds, tool_conf, tooltip_preds, tooltip_conf = self.forward(
-                    images
-                )
+                tool_labels = tool_labels.to(device).float()
+                tooltip_labels = tooltip_labels.to(device).float()
+                tool_targets = tool_targets.to(device).float()
+                tooltip_targets = tooltip_targets.to(device).float()
 
-                loss_tool, conf_loss_tool = self.compute_losses(
-                    tool_preds, tool_labels, tool_conf, tool_targets
-                )
-                loss_tooltip, conf_loss_tooltip = self.compute_losses(
-                    tooltip_preds, tooltip_labels, tooltip_conf, tooltip_targets
-                )
+                tool_preds, tool_conf, tooltip_preds, tooltip_conf = self.forward(images)
+
+                loss_tool, conf_loss_tool = self.compute_losses(tool_preds, tool_labels, tool_conf, tool_targets)
+                loss_tooltip, conf_loss_tooltip = self.compute_losses(tooltip_preds, tooltip_labels, tooltip_conf, tooltip_targets)
 
                 loss = loss_tool + loss_tooltip + conf_loss_tool + conf_loss_tooltip
                 val_loss += loss.item()
+
+            torch.cuda.empty_cache()
+            torch.cuda.empty_cache()
 
         end_time = time.time()
         print(
@@ -788,12 +807,18 @@ def process_images(input_dir, output_dir, label_dir, output_dir_labels):
 
 
 def main():
+    os.system("set PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True")
+
+    torch.cuda.empty_cache()
+    torch.cuda.empty_cache()
+    
     # process_images(
     #     "data/6DOF/images/val",
     #     "data/6DOF/processed_images/val",
     #     "data/6DOF/labels/val",
     #     "data/6DOF/processed_labels/val",
     # )
+    
     transform = transforms.Compose([transforms.ToTensor()])
 
     train_dataset = ToolDataset(
@@ -809,12 +834,6 @@ def main():
 
     train_loader = DataLoader(train_dataset, batch_size=8, shuffle=True)
     val_loader = DataLoader(val_dataset, batch_size=8, shuffle=False)
-
-    # Test getting the first image
-    for images, labels in train_loader:
-        print(images[0].shape)
-        print(labels[0])
-        break
 
     model = SIMOModel(n_classes=4, backbone="vgg", use_focal_loss=False).to(device)
 
