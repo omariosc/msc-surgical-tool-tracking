@@ -1,0 +1,7 @@
+
+datasets:
+train: ../data/6DOF//images/train
+val: ../data/6DOF//images/val
+
+nc: 2  # number of classes
+names: ['tool', 'tip']  # class names
