@@ -20,18 +20,18 @@ dataset_path = "data/6DOF/"
 # Create a configuration file for YOLOv10
 config_content = f"""
 datasets:
-train: ../{dataset_path}/images/train
-val: ../{dataset_path}/images/val
+train: ../{dataset_path}/images/final
+val: ../{dataset_path}/images/test
 
 nc: 2  # number of classes
 names: ['tool', 'tip']  # class names
 """
 
-config_path = os.path.join("yaml/6DOF Multiclass.yaml")
+config_path = os.path.join("yaml/6DOF Large Training.yaml")
 with open(config_path, "w") as file:
     file.write(config_content)
 
-config_path = "yaml/6DOF Multiclass.yaml"
+config_path = "yaml/6DOF Large Training.yaml"
 # config_path_test = os.path.join(dataset_path, "data-small-test.yaml")
 # config_path_final = os.path.join(dataset_path, "data-small-final.yaml")
 # config_path_combined = os.path.join("yaml/data-combined.yaml")
@@ -64,8 +64,8 @@ def train(n):
         save_txt=True,
         optimize=True,
         amp=True,
-        patience=5,
-        save_period=1,
+        patience=300,
+        save_period=10,
     )
 
 def test(n):
@@ -73,32 +73,33 @@ def test(n):
     model.to(device)
     results = model.val(data=config_path)
     print(results.results_dict)
-
-    # model.track(
-    #     # "D:\Data\RARP-45_train/train\Log_D2P280782_2017.11.20_12.20.03_4\DVC\EndoscopeImageMemory_0_sync.avi",
-    #     # "D:\Data\PETRAW\Test\Video\/054.mp4",
-    #     "data/6DOF/Dataset.mp4",
-    #     tracker="bytetrack.yaml",
-    #     save=True,
-    #     show=False,
-    #     # save_dir=f"chkpts/6DOF/v10{n}",
-    #     # stream=True,
-    # )
+    model.track(
+        f"data/6DOF/Test 1.mp4",
+        tracker="bytetrack.yaml",
+        save=True,
+        show=False,
+    )
 
 
 def track(n, show=False, save=True):
     model = YOLOv10(f"chkpts/6DOF/v10{n}/yolov10{n}-detect-6dof/weights/best.pt")
     model.to(device)
-    model.track(
-        # "D:\Data\RARP-45_train/train\Log_D2P280782_2017.11.20_12.20.03_4\DVC\EndoscopeImageMemory_0_sync.avi",
-        "data/6DOF/Test 5.mp4",
-        # "data/6DOF/Dataset.mp4",
-        tracker="bytetrack.yaml",
-        save=save,
-        show=show,
-        # save_dir=f"chkpts/ART/v10{n}",
-        # stream=True,
-    )
+    # model.track(
+    #     "data/6DOF/Dataset.mp4",
+    #     tracker="bytetrack.yaml",
+    #     save=save,
+    #     show=show,
+    # )
+    for i in range(1, 25):
+        if i != 1:
+            continue
+        model.track(
+            f"data/6DOF/Test {i}.mp4",
+            # "data/6DOF/Dataset.mp4",
+            tracker="bytetrack.yaml",
+            save=save,
+            show=show,
+        )
 
 
 if __name__ == "__main__":
@@ -111,22 +112,22 @@ if __name__ == "__main__":
     # m = "x"
     # Save output to a file
     orig_stdout = sys.stdout
-    f = open(f"chkpts/6DOF/v10{m}/yolov10{m}-val-out.txt", "w")
+    f = open(f"chkpts/6DOF/v10{m}/yolov10{m}-train-out.txt", "w")
     sys.stdout = f
 
-    # # Log time to train
-    # print(f"Training model {m}")
-    # start = time.time()
-    # # Train the model
-    # train(m)
-    # end = time.time()
-    # print(f"Time to train model {m}: {end - start}")
+    # Log time to train
+    print(f"Training model {m}")
+    start = time.time()
+    # Train the model
+    train(m)
+    end = time.time()
+    print(f"Time to train model {m}: {end - start}")
 
     print(f"Testing model {m}")
     start = time.time()
     # Test the model
-    # test(m)
-    track(m)
+    test(m)
+    # track(m, show=True, save=False)
     end = time.time()
     print(f"Time to test model {m}: {end - start}")
 
