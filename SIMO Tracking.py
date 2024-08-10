@@ -15,7 +15,7 @@ from torchvision.transforms import functional
 import torch.optim as optim
 from scipy.optimize import linear_sum_assignment
 from sklearn.metrics import precision_recall_curve, average_precision_score
-
+from scipy.spatial import distance
 
 # Set device
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -77,9 +77,8 @@ class ToolDataset(Dataset):
 
 
 class SIMOModel(nn.Module):
-    def __init__(self, n_classes=4, backbone="vgg", use_focal_loss=False):
+    def __init__(self, n_classes=4, backbone="vgg"):
         super(SIMOModel, self).__init__()
-        self.use_focal_loss = use_focal_loss
 
         # Choose the backbone model
         if backbone == "vgg":
@@ -206,7 +205,7 @@ class SIMOModel(nn.Module):
         total_time = 0
         self.to(device)
         optimizer = optim.Adam(self.parameters(), lr=lr)
-        checkpoints_folder = "chkpts/SIMO/weights"
+        checkpoints_folder = "chkpts/SIMO/ART/weights"
         if not os.path.exists(checkpoints_folder):
             os.makedirs(checkpoints_folder)
 
@@ -313,7 +312,7 @@ class SIMOModel(nn.Module):
                         tooltip_labels[:, 1],
                     ],
                 )
-                val_loss += loss.item()                
+                val_loss += loss.item()
 
             torch.cuda.empty_cache()
             torch.cuda.empty_cache()
@@ -354,51 +353,15 @@ class SIMOModel(nn.Module):
             )  # Confidence label (first column), reshape to match pred_conf
 
             # Compute IoU loss for bounding boxes
-            iou_loss_value = iou_loss(pred_bbox, label_bbox)
+            iou_loss_value = self.iou_loss(pred_bbox, label_bbox)
 
-            # Compute confidence loss
-            if self.use_focal_loss:
-                conf_loss_value = focal_loss(pred_conf, label_conf)
-            else:
-                conf_loss_value = F.binary_cross_entropy_with_logits(
-                    pred_conf, label_conf
-                )
+            conf_loss_value = F.binary_cross_entropy_with_logits(
+                pred_conf, label_conf
+            )
 
             total_loss += iou_loss_value + conf_loss_value
 
         return total_loss
-
-    def compute_metrics(
-        self,
-        tool_preds,
-        tool_labels,
-        tool_conf,
-        tooltip_preds,
-        tooltip_labels,
-        tooltip_conf,
-    ):
-        precisions_tool, recalls_tool, mAP_tool, mAP_50_95_tool = compute_metrics(
-            tool_preds, tool_labels, tool_conf
-        )
-        precisions_tip, recalls_tip, mAP_tip, mAP_50_95_tip = compute_metrics(
-            tooltip_preds, tooltip_labels, tooltip_conf
-        )
-
-        metrics = {
-            "tool": {
-                "precisions": precisions_tool.tolist(),
-                "recalls": recalls_tool.tolist(),
-                "mAP": mAP_tool,
-                "mAP_50_95": mAP_50_95_tool,
-            },
-            "tooltip": {
-                "precisions": precisions_tip.tolist(),
-                "recalls": recalls_tip.tolist(),
-                "mAP": mAP_tip,
-                "mAP_50_95": mAP_50_95_tip,
-            },
-        }
-        return metrics
 
     def visualize_bounding_boxes(
         self,
@@ -423,8 +386,10 @@ class SIMOModel(nn.Module):
         tooltip_1_preds = tooltip_1_preds.cpu().numpy().T
         tooltip_2_preds = tooltip_2_preds.cpu().numpy().T
 
-        fig, ax = plt.subplots()
+        fig, ax = plt.subplots(1)
         ax.axis("off")
+        ax.imshow(image)
+        fig.tight_layout(pad=0)
         # Define the data for each tool/tooltip type
         items = [
             (tool_1_preds, tool_1_conf, "red", "Tool 1"),
@@ -437,7 +402,9 @@ class SIMOModel(nn.Module):
         for preds, confs, color, label in items:
             for pred, conf in zip(preds, confs):
                 try:
-                    x, y, w, h = map(int, pred)  # Convert all values to integers at once
+                    x, y, w, h = map(
+                        int, pred
+                    )  # Convert all values to integers at once
                     ax.add_patch(
                         matplotlib.patches.Rectangle(
                             (x, y),
@@ -460,111 +427,7 @@ class SIMOModel(nn.Module):
 
         plt.close()
 
-    def track_on_images(self, image_folder, save_folder="chkpts/SIMO/tracking"):
-        if not os.path.exists(image_folder):
-            os.makedirs(image_folder)
-
-        images = []
-        for i in range(1, 10):
-            image = cv2.imread(f"{image_folder}/{i}.png")
-            image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-            image = cv2.resize(image, (512, 512))
-            image = image / 255.0
-            image = (
-                torch.tensor(image, dtype=torch.float32)
-                .permute(2, 0, 1)
-                .unsqueeze(0)
-                .to(device)
-            )
-            images.append(image)
-
-        tracks = self.track_objects(images)
-        print(tracks)
-
-        if not os.path.exists(save_folder):
-            os.makedirs(save_folder)
-
-        for i, image in enumerate(images):
-            image = image.squeeze(0).permute(1, 2, 0).cpu().numpy()
-            image = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
-
-            for box, conf in tracks[i]:
-                x, y, w, h = box
-                x, y, w, h = int(x), int(y), int(w), int(h)
-                cv2.rectangle(image, (x, y), (x + w, y + h), (0, 255, 0), 2)
-
-            save_path = os.path.join(save_folder, f"frame_{i+1}.png")
-            cv2.imwrite(save_path, image)
-
-    def track_on_videos(self, video_folder, save_folder="chkpts/SIMO/tracking_videos"):
-        if not os.path.exists(save_folder):
-            os.makedirs(save_folder)
-
-        for video_file in os.listdir(video_folder):
-            if not video_file.endswith(".mp4"):
-                continue
-
-            cap = cv2.VideoCapture(os.path.join(video_folder, video_file))
-            frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-            width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-            height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-            fps = cap.get(cv2.CAP_PROP_FPS)
-
-            out = cv2.VideoWriter(
-                os.path.join(save_folder, video_file),
-                cv2.VideoWriter_fourcc(*"mp4v"),
-                fps,
-                (width, height),
-            )
-
-            frames = []
-            while cap.isOpened():
-                ret, frame = cap.read()
-                if not ret:
-                    break
-                frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-                frame_resized = cv2.resize(frame_rgb, (512, 512))
-                frame_resized = frame_resized / 255.0
-                frame_tensor = (
-                    torch.tensor(frame_resized, dtype=torch.float32)
-                    .permute(2, 0, 1)
-                    .unsqueeze(0)
-                    .to(device)
-                )
-                frames.append(frame_tensor)
-
-                if len(frames) == 16 or len(frames) == frame_count:
-                    tracks = self.track_objects(frames)
-                    for i, frame in enumerate(frames):
-                        frame = frame.squeeze(0).permute(1, 2, 0).cpu().numpy()
-                        frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
-
-                        for box, conf in tracks[i]:
-                            x, y, w, h = box
-                            x, y, w, h = int(x), int(y), int(w), int(h)
-                            cv2.rectangle(frame, (x, y), (x + w, y + h), (0, 255, 0), 2)
-
-                        out.write(frame)
-
-                    frames = []
-
-            cap.release()
-            out.release()
-
-    def track_objects(self, images):
-        tracker = ObjectTracker()  # Instantiate the tracker
-
-        for frame in images:
-            tool_boxes, tool_confs, tooltip_boxes, tooltip_confs = self.detect_objects(
-                frame
-            )
-
-            # Update tracker with detected boxes and confidences
-            tracker.update(tool_boxes, tool_confs, tooltip_boxes, tooltip_confs)
-
-        return tracker.get_tracks()  # Get the tracked object paths
-
-    def load_best_weights(self, weights_folder="chkpts/SIMO/weights"):
+    def load_best_weights(self, weights_folder="chkpts/SIMO/ART/weights"):
         best_weights = os.path.join(weights_folder, "best.pt")
         if os.path.exists(best_weights):
             self.load_state_dict(torch.load(best_weights))
@@ -572,39 +435,85 @@ class SIMOModel(nn.Module):
         else:
             print("No best weights found.")
 
-    def run_on_test_images(
-        self,
-        test_image_folder="data/ART-Net/images/val",
-        num_pos=20,
-        num_neg=5,
-        output_dir="results/ART/SIMO",
-    ):
-        test_images = []
-        pos_images = [
-            os.path.join(test_image_folder, f)
-            for f in os.listdir(test_image_folder)
-            if "Pos" in f and not f.endswith("_bbox.png")
-        ]
-        neg_images = [
-            os.path.join(test_image_folder, f)
-            for f in os.listdir(test_image_folder)
-            if "Neg" in f and not f.endswith("_bbox.png")
-        ]
-        pos_images = np.random.choice(pos_images, num_pos, replace=False).tolist()
-        neg_images = np.random.choice(neg_images, num_neg, replace=False).tolist()
-        test_images.extend(pos_images + neg_images)
+    def compute_metrics(pred_boxes, true_boxes, conf_scores, iou_thresholds=[0.5]):
+        binary_true_boxes = []
+        binary_pred_boxes = []
+        valid_conf_scores = []
 
-        self.validate_on_images(test_images, output_dir)
+        for i in range(len(true_boxes)):
+            iou_scores = [
+                self.iou(pred_boxes[i], true_boxes[j]) for j in range(len(true_boxes))
+            ]
+            max_iou = max(iou_scores)
+            for iou_threshold in iou_thresholds:
+                if max_iou > iou_threshold:
+                    binary_true_boxes.append(1)
+                    binary_pred_boxes.append(1)
+                else:
+                    binary_true_boxes.append(0)
+                    binary_pred_boxes.append(0)
+            valid_conf_scores.append(conf_scores[i].cpu().item())
 
-    def validate_on_images(self, val_images, output_dir):
+        precisions, recalls, _ = precision_recall_curve(
+            binary_true_boxes, valid_conf_scores
+        )
+        ap50 = average_precision_score(binary_true_boxes, valid_conf_scores)
+
+        aps = []
+        for threshold in np.linspace(0.5, 0.95, 10):
+            binary_true_boxes = []
+            binary_pred_boxes = []
+            for i in range(len(true_boxes)):
+                iou_scores = [
+                    self.iou(pred_boxes[i], true_boxes[j]) for j in range(len(true_boxes))
+                ]
+                max_iou = max(iou_scores)
+                if max_iou > threshold:
+                    binary_true_boxes.append(1)
+                    binary_pred_boxes.append(1)
+                else:
+                    binary_true_boxes.append(0)
+                    binary_pred_boxes.append(0)
+
+            ap = average_precision_score(binary_true_boxes, valid_conf_scores)
+            aps.append(ap)
+
+        mAP_50_95 = np.mean(aps)
+
+        return precisions, recalls, ap50, mAP_50_95
+
+    def test(self, input_dir, output_dir, tracking=False):
         os.makedirs(output_dir, exist_ok=True)
         self.eval()
+        all_tool_preds, all_tool_labels, all_tool_confs = [], [], []
+        all_tooltip_preds, all_tooltip_labels, all_tooltip_confs = [], [], []
+        if tracking:
+            prev_tool_centres = None
+            prev_tooltip_centres = None
+            # images will be in format test5_0.png, test5_1.png, test5_2.png, ... so sort them based on number
+            images = sorted(
+                [
+                    os.path.join(input_dir, f)
+                    for f in os.listdir(input_dir)
+                    if f.endswith(".png")
+                ],
+                key=lambda x: int(x.split("_")[-1].split(".")[0]),
+            )
+        else:
+            images = sorted(
+                [
+                    os.path.join(input_dir, f)
+                    for f in os.listdir(input_dir)
+                    if f.endswith(".png")
+                ]
+            )
         with torch.no_grad():
-            for val_image in val_images:
-                image = Image.open(val_image)
+            for path in images:
+                image = Image.open(path)
                 image = functional.to_tensor(image)
                 image = functional.resize(image, (512, 512))
                 image = image.unsqueeze(0).to(device)
+
                 (
                     tool_1_pred,
                     tool_1_conf,
@@ -615,8 +524,26 @@ class SIMOModel(nn.Module):
                     tooltip_2_pred,
                     tooltip_2_conf,
                 ) = self.forward(image)
+
+                if tracking:
+                    (
+                        tool_1_pred,
+                        tool_2_pred,
+                        tooltip_1_pred,
+                        tooltip_2_pred,
+                        prev_tool_centres,
+                        prev_tooltip_centres,
+                    ) = self.track_objects(
+                        prev_tool_centres,
+                        prev_tooltip_centres,
+                        tool_1_pred,
+                        tool_2_pred,
+                        tooltip_1_pred,
+                        tooltip_2_pred,
+                    )
                 self.visualize_bounding_boxes(
-                    image,tool_1_pred,
+                    image,
+                    tool_1_pred,
                     tool_1_conf,
                     tool_2_pred,
                     tool_2_conf,
@@ -624,178 +551,198 @@ class SIMOModel(nn.Module):
                     tooltip_1_conf,
                     tooltip_2_pred,
                     tooltip_2_conf,
-                    save_path=os.path.join(output_dir, os.path.basename(val_image)),
+                    save_path=os.path.join(output_dir, os.path.basename(path)),
                 )
 
+                # Append predictions and confidences for metrics calculation
+                all_tool_preds.append(tool_1_pred)
+                all_tool_preds.append(tool_2_pred)
+                all_tool_labels.append(
+                    tool_1_pred
+                )  # Ground truth labels should be available to calculate metrics properly
+                all_tool_labels.append(tool_2_pred)
+                all_tool_confs.append(tool_1_conf)
+                all_tool_confs.append(tool_2_conf)
 
-# Define the ObjectTracker class
-class ObjectTracker:
-    def __init__(self, max_age=30, min_hits=3, iou_threshold=0.3):
-        self.max_age = max_age
-        self.min_hits = min_hits
-        self.iou_threshold = iou_threshold
-        self.trackers = []
-        self.frame_count = 0
+                all_tooltip_preds.append(tooltip_1_pred)
+                all_tooltip_preds.append(tooltip_2_pred)
+                all_tooltip_labels.append(
+                    tooltip_1_pred
+                )  # Ground truth labels should be available to calculate metrics properly
+                all_tooltip_labels.append(tooltip_2_pred)
+                all_tooltip_confs.append(tooltip_1_conf)
+                all_tooltip_confs.append(tooltip_2_conf)
 
-    def iou(self, box1, box2):
-        x1, y1, x2, y2 = box1
-        x1g, y1g, x2g, y2g = box2
+            # Compute metrics for tools
+            precisions_tool, recalls_tool, mAP_50_tool, mAP_50_95_tool = (
+                self.compute_metrics(all_tool_preds, all_tool_labels, all_tool_confs)
+            )
+            # Compute metrics for tooltips
+            precisions_tooltip, recalls_tooltip, mAP_50_tooltip, mAP_50_95_tooltip = (
+                self.compute_metrics(
+                    all_tooltip_preds, all_tooltip_labels, all_tooltip_confs
+                )
+            )
 
-        xx1 = max(x1, x1g)
-        yy1 = max(y1, y1g)
-        xx2 = min(x2, x2g)
-        yy2 = min(y2, y2g)
-
-        w = max(0.0, xx2 - xx1)
-        h = max(0.0, yy2 - yy1)
-
-        inter_area = w * h
-        union_area = (x2 - x1) * (y2 - y1) + (x2g - x1g) * (y2g - y1g) - inter_area
-
-        return inter_area / union_area
-
-    def update(self, tool_boxes, tool_confs, tooltip_boxes, tooltip_confs):
-        self.frame_count += 1
-
-        # Convert detections to numpy for easier manipulation
-        tool_boxes = tool_boxes.cpu().detach().numpy()
-        tool_confs = tool_confs.cpu().detach().numpy()
-        tooltip_boxes = tooltip_boxes.cpu().detach().numpy()
-        tooltip_confs = tooltip_confs.cpu().detach().numpy()
-
-        detections = list(zip(tool_boxes, tool_confs)) + list(
-            zip(tooltip_boxes, tooltip_confs)
+        # Print the metrics
+        print(
+            f"Tool - Precision: {precisions_tool[-1]}, Recall: {recalls_tool[-1]}, mAP@50: {mAP_50_tool}, mAP@50-95: {mAP_50_95_tool}"
+        )
+        print(
+            f"Tooltip - Precision: {precisions_tooltip[-1]}, Recall: {recalls_tooltip[-1]}, mAP@50: {mAP_50_tooltip}, mAP@50-95: {mAP_50_95_tooltip}"
         )
 
-        # Implement DeepSORT
-        if self.frame_count > 1:
-            if len(self.trackers) == 0:
-                previous_detections = self.trackers[-2]
-
-                cost_matrix = np.zeros((len(previous_detections), len(detections)))
-                for i, prev in enumerate(previous_detections):
-                    for j, detection in enumerate(detections):
-                        cost_matrix[i, j] = self.iou(prev[0], detection[0])
-
-                row_ind, col_ind = linear_sum_assignment(cost_matrix)
-
-                for i, j in zip(row_ind, col_ind):
-                    self.trackers[-2][i] = detections[j]
-            else:
-                self.trackers.append(detections)
-
-        if self.frame_count > self.max_age:
-            self.trackers.pop(0)
-
-        self.trackers.append(detections)
-
-    def get_tracks(self):
-        return self.trackers
-
-
-def iou(pred, target, smooth=1e-6):
-    """
-    Compute the Intersection over Union (IoU) between two sets of boxes.
-    """
-    try:
-        # Calculate intersection
-        inter_xmin = torch.max(pred[:, 0], target[:, 0])
-        inter_ymin = torch.max(pred[:, 1], target[:, 1])
-        inter_xmax = torch.min(pred[:, 2], target[:, 2])
-        inter_ymax = torch.min(pred[:, 3], target[:, 3])
-
-        inter_area = torch.clamp(inter_xmax - inter_xmin, min=0) * torch.clamp(
-            inter_ymax - inter_ymin, min=0
+        return (
+            precisions_tool,
+            recalls_tool,
+            mAP_50_tool,
+            mAP_50_95_tool,
+            precisions_tooltip,
+            recalls_tooltip,
+            mAP_50_tooltip,
+            mAP_50_95_tooltip,
         )
 
-        # Calculate union
-        pred_area = (pred[:, 2] - pred[:, 0]) * (pred[:, 3] - pred[:, 1])
-        target_area = (target[:, 2] - target[:, 0]) * (target[:, 3] - target[:, 1])
+    def track_objects(
+        self,
+        prev_tool_centres,
+        prev_tooltip_centres,
+        tool_1_pred,
+        tool_2_pred,
+        tooltip_1_pred,
+        tooltip_2_pred,
+    ):
+        try:
+            # Compute centres of the predicted bounding boxes
+            tool_centres = []
+            tooltip_centres = []
 
-        union_area = pred_area + target_area - inter_area
+            if tool_1_pred is not None and tool_2_pred is not None:
+                tool_centres = [
+                    (tool_1_pred[0] + tool_1_pred[2]) / 2,
+                    (tool_2_pred[0] + tool_2_pred[2]) / 2,
+                ]
+            elif tool_1_pred is not None:
+                tool_centres = [(tool_1_pred[0] + tool_1_pred[2]) / 2]
+            elif tool_2_pred is not None:
+                tool_centres = [(tool_2_pred[0] + tool_2_pred[2]) / 2]
 
-        iou = (inter_area + smooth) / (union_area + smooth)
-        return iou
-    except Exception as e:
-        return 0.0
+            if tooltip_1_pred is not None and tooltip_2_pred is not None:
+                tooltip_centres = [
+                    (tooltip_1_pred[0] + tooltip_1_pred[2]) / 2,
+                    (tooltip_2_pred[0] + tooltip_2_pred[2]) / 2,
+                ]
+            elif tooltip_1_pred is not None:
+                tooltip_centres = [(tooltip_1_pred[0] + tooltip_1_pred[2]) / 2]
+            elif tooltip_2_pred is not None:
+                tooltip_centres = [(tooltip_2_pred[0] + tooltip_2_pred[2]) / 2]
 
-
-def iou_loss(pred, target):
-    """
-    Compute IoU loss.
-    """
-    iou_score = iou(pred, target)
-    return 1 - iou_score
-
-
-class FocalLoss(nn.Module):
-    def __init__(self, alpha=1, gamma=2):
-        super(FocalLoss, self).__init__()
-        self.alpha = alpha
-        self.gamma = gamma
-
-    def forward(self, inputs, targets):
-        BCE_loss = F.binary_cross_entropy_with_logits(inputs, targets, reduction="none")
-        pt = torch.exp(-BCE_loss)
-        F_loss = self.alpha * (1 - pt) ** self.gamma * BCE_loss
-        return F_loss.mean()
-
-
-focal_loss = FocalLoss()
-
-
-def compute_metrics(pred_boxes, true_boxes, conf_scores, iou_threshold=0.5):
-    binary_true_boxes = []
-    binary_pred_boxes = []
-    valid_conf_scores = []
-
-    for i in range(len(true_boxes)):
-        iou_scores = [
-            iou(pred_boxes[i].cpu(), true_boxes[j].cpu())
-            for j in range(len(true_boxes))
-        ]
-        max_iou = max(iou_scores)
-        if max_iou > iou_threshold:
-            binary_true_boxes.append(1)
-            binary_pred_boxes.append(1)
-        else:
-            binary_true_boxes.append(0)
-            binary_pred_boxes.append(0)
-        valid_conf_scores.append(conf_scores[i].cpu().item())  # Convert to scalar
-
-    binary_true_boxes = np.array(binary_true_boxes)
-    binary_pred_boxes = np.array(binary_pred_boxes)
-    valid_conf_scores = np.array(valid_conf_scores)
-
-    precisions, recalls, _ = precision_recall_curve(
-        binary_true_boxes, valid_conf_scores
-    )
-    ap50 = average_precision_score(binary_true_boxes, valid_conf_scores)
-
-    iou_thresholds = np.linspace(0.5, 0.95, 10)
-    aps = []
-    for threshold in iou_thresholds:
-        binary_true_boxes = []
-        binary_pred_boxes = []
-        for i in range(len(true_boxes)):
-            iou_scores = [
-                iou(pred_boxes[i].cpu(), true_boxes[j].cpu())
-                for j in range(len(true_boxes))
-            ]
-            max_iou = max(iou_scores)
-            if max_iou > threshold:
-                binary_true_boxes.append(1)
-                binary_pred_boxes.append(1)
+            if prev_tool_centres is None:
+                prev_tool_centres = tool_centres
+                prev_tooltip_centres = tooltip_centres
             else:
-                binary_true_boxes.append(0)
-                binary_pred_boxes.append(0)
+                if tool_centres:
+                    # Compute distances between previous and current centres for tools
+                    tool_distances = distance.cdist(
+                        prev_tool_centres, tool_centres, "euclidean"
+                    )
 
-        ap = average_precision_score(binary_true_boxes, valid_conf_scores)
-        aps.append(ap)
+                    # Assign the closest previous centre to the current one
+                    if len(tool_centres) == 2:
+                        tool_1_pred, tool_2_pred = (
+                            (
+                                tool_1_pred
+                                if tool_distances[0][0] < tool_distances[1][0]
+                                else tool_2_pred
+                            ),
+                            (
+                                tool_2_pred
+                                if tool_distances[0][0] < tool_distances[1][0]
+                                else tool_1_pred
+                            ),
+                        )
+                    elif len(tool_centres) == 1:
+                        tool_1_pred = (
+                            tool_1_pred
+                            if prev_tool_centres[0] == tool_centres[0]
+                            else tool_2_pred
+                        )
 
-    mAP_50_95 = np.mean(aps)
+                if tooltip_centres:
+                    # Compute distances between previous and current centres for tooltips
+                    tooltip_distances = distance.cdist(
+                        prev_tooltip_centres, tooltip_centres, "euclidean"
+                    )
 
-    return precisions, recalls, ap50, mAP_50_95
+                    # Assign the closest previous centre to the current one
+                    if len(tooltip_centres) == 2:
+                        tooltip_1_pred, tooltip_2_pred = (
+                            (
+                                tooltip_1_pred
+                                if tooltip_distances[0][0] < tooltip_distances[1][0]
+                                else tooltip_2_pred
+                            ),
+                            (
+                                tooltip_2_pred
+                                if tooltip_distances[0][0] < tooltip_distances[1][0]
+                                else tooltip_1_pred
+                            ),
+                        )
+                    elif len(tooltip_centres) == 1:
+                        tooltip_1_pred = (
+                            tooltip_1_pred
+                            if prev_tooltip_centres[0] == tooltip_centres[0]
+                            else tooltip_2_pred
+                        )
+
+                prev_tool_centres = tool_centres
+                prev_tooltip_centres = tooltip_centres
+
+        except Exception as e:
+            print(f"Error during tracking: {e}")
+
+        return (
+            tool_1_pred,
+            tool_2_pred,
+            tooltip_1_pred,
+            tooltip_2_pred,
+            prev_tool_centres,
+            prev_tooltip_centres,
+        )
+
+    def iou(self, pred, target, smooth=1e-6):
+        """
+        Compute the Intersection over Union (IoU) between two sets of boxes.
+        """
+        try:
+            # Calculate intersection
+            inter_xmin = torch.max(pred[:, 0], target[:, 0])
+            inter_ymin = torch.max(pred[:, 1], target[:, 1])
+            inter_xmax = torch.min(pred[:, 2], target[:, 2])
+            inter_ymax = torch.min(pred[:, 3], target[:, 3])
+
+            inter_area = torch.clamp(inter_xmax - inter_xmin, min=0) * torch.clamp(
+                inter_ymax - inter_ymin, min=0
+            )
+
+            # Calculate union
+            pred_area = (pred[:, 2] - pred[:, 0]) * (pred[:, 3] - pred[:, 1])
+            target_area = (target[:, 2] - target[:, 0]) * (target[:, 3] - target[:, 1])
+
+            union_area = pred_area + target_area - inter_area
+
+            iou = (inter_area + smooth) / (union_area + smooth)
+            return iou
+        except Exception as e:
+            return 0.0
+
+
+    def iou_loss(self, pred, target):
+        """
+        Compute IoU loss.
+        """
+        iou_score = self.iou(pred, target)
+        return 1 - iou_score
 
 
 def preprocess_background(image1, image2):
@@ -914,20 +861,18 @@ def main():
     train_loader = DataLoader(train_dataset, batch_size=8, shuffle=True)
     val_loader = DataLoader(val_dataset, batch_size=8, shuffle=False)
 
-    model = SIMOModel(n_classes=4, backbone="vgg", use_focal_loss=False).to(device)
+    model = SIMOModel(n_classes=4, backbone="vgg").to(device)
 
-    model.train_model(train_loader, val_loader, num_epochs=300, lr=0.001, patience=10)
+    # model.train_model(train_loader, val_loader, num_epochs=300, lr=0.001, patience=3)
 
     # Load best weights and run evaluation on validation set
-    model.load_best_weights()
-    val_images = [
-        "data/ART-Net/images/train/Train_Pos_sample_0001.png",
-        "data/ART-Net/images/train/Train_Neg_sample_0002.png",
-    ]
-    model.validate_on_images(val_images, "results/ART/SIMO")
-    model.run_on_test_images(
-        test_image_folder="data/ART-Net/images/val", num_pos=20, num_neg=5, output_dir="results/ART/SIMO"
+    model.load_best_weights("chkpts/SIMO/ART/weights")
+    results = model.test(
+        input_dir="data/ART-Net/images/val",
+        output_dir="chkpts/SIMO/ART/output",
+        tracking=False,
     )
+    print(results)
 
 
 if __name__ == "__main__":
