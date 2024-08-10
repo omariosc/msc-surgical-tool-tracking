@@ -1,6 +1,7 @@
 import os
 import sys
 import time
+import cv2
 import matplotlib.pyplot as plt
 from ultralytics import YOLO
 from ultralytics import YOLOv10
@@ -73,20 +74,20 @@ def test(n):
     results = model.val(data=config_path)
     print(results.results_dict)
 
-    model.track(
-        # "D:\Data\RARP-45_train/train\Log_D2P280782_2017.11.20_12.20.03_4\DVC\EndoscopeImageMemory_0_sync.avi",
-        # "D:\Data\PETRAW\Test\Video\/054.mp4",
-        "data/6DOF/Dataset.mp4",
-        tracker="bytetrack.yaml",
-        save=True,
-        show=False,
-        # save_dir=f"chkpts/6DOF/v10{n}",
-        # stream=True,
-    )
+    # model.track(
+    #     # "D:\Data\RARP-45_train/train\Log_D2P280782_2017.11.20_12.20.03_4\DVC\EndoscopeImageMemory_0_sync.avi",
+    #     # "D:\Data\PETRAW\Test\Video\/054.mp4",
+    #     "data/6DOF/Dataset.mp4",
+    #     tracker="bytetrack.yaml",
+    #     save=True,
+    #     show=False,
+    #     # save_dir=f"chkpts/6DOF/v10{n}",
+    #     # stream=True,
+    # )
 
     model.track(
         # "D:\Data\RARP-45_train/train\Log_D2P280782_2017.11.20_12.20.03_4\DVC\EndoscopeImageMemory_0_sync.avi",
-        "data/6DOF/Test 5 Labelled (Tips).mp4",
+        "data/6DOF/Test 5.mp4",
         # "data/6DOF/Dataset.mp4",
         tracker="bytetrack.yaml",
         save=True,
@@ -103,19 +104,19 @@ if __name__ == "__main__":
 
     # for m in models:
     m = sys.argv[1]
-
+    # m = "x"
     # Save output to a file
     orig_stdout = sys.stdout
-    f = open(f"chkpts/6DOF/v10{m}/yolov10{m}-code-out.txt", "w")
+    f = open(f"chkpts/6DOF/v10{m}/yolov10{m}-val-out.txt", "w")
     sys.stdout = f
 
-    # Log time to train
-    print(f"Training model {m}")
-    start = time.time()
-    # Train the model
-    train(m)
-    end = time.time()
-    print(f"Time to train model {m}: {end - start}")
+    # # Log time to train
+    # print(f"Training model {m}")
+    # start = time.time()
+    # # Train the model
+    # train(m)
+    # end = time.time()
+    # print(f"Time to train model {m}: {end - start}")
 
     print(f"Testing model {m}")
     start = time.time()
