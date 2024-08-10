@@ -248,7 +248,6 @@ class SIMOModel(nn.Module):
                 print(f"Batch {batch+1}/{len(train_loader)}, Loss: {loss.item()}")
                 torch.cuda.empty_cache()
                 torch.cuda.empty_cache()
-                
 
             avg_train_loss = running_loss / len(train_loader)
             train_losses.append(avg_train_loss)
@@ -318,7 +317,7 @@ class SIMOModel(nn.Module):
 
             torch.cuda.empty_cache()
             torch.cuda.empty_cache()
-            
+
         end_time = time.time()
         print(
             f"Time per image: {(end_time - start_time) / len(val_loader):.2f} seconds"
@@ -426,91 +425,33 @@ class SIMOModel(nn.Module):
 
         fig, ax = plt.subplots()
         ax.axis("off")
-        # Plot rectangle with class (tool or tooltip) and confidence score
-        # if error then continue
-        for i, (pred, conf) in enumerate(
-            zip(tool_1_preds, tool_1_conf), start=1
-        ):
-            try:
-                x, y, w, h = pred
-                x, y, w, h = int(x), int(y), int(w), int(h)
-                ax.add_patch(
-                    matplotlib.patches.Rectangle(
-                        (x, y),
-                        w,
-                        h,
-                        edgecolor="red",
-                        facecolor="none",
-                        linewidth=2,
-                        label=f"Tool 1, Conf: {conf:.2f}",
-                    )
-                )
-                ax.text(x, y, f"Tool 1, {conf:.2f}", color="red")
-            except:
-                pass
+        # Define the data for each tool/tooltip type
+        items = [
+            (tool_1_preds, tool_1_conf, "red", "Tool 1"),
+            (tool_2_preds, tool_2_conf, "blue", "Tool 2"),
+            (tooltip_1_preds, tooltip_1_conf, "green", "Tooltip 1"),
+            (tooltip_2_preds, tooltip_2_conf, "orange", "Tooltip 2"),
+        ]
 
-        for i, (pred, conf) in enumerate(
-            zip(tool_2_preds, tool_2_conf), start=1
-        ):
-            try:
-                x, y, w, h = pred
-                x, y, w, h = int(x), int(y), int(w), int(h)
-                ax.add_patch(
-                    matplotlib.patches.Rectangle(
-                        (x, y),
-                        w,
-                        h,
-                        edgecolor="blue",
-                        facecolor="none",
-                        linewidth=2,
-                        label=f"Tool 2, Conf: {conf:.2f}",
+        # Iterate through the items to add patches and labels
+        for preds, confs, color, label in items:
+            for pred, conf in zip(preds, confs):
+                try:
+                    x, y, w, h = map(int, pred)  # Convert all values to integers at once
+                    ax.add_patch(
+                        matplotlib.patches.Rectangle(
+                            (x, y),
+                            w,
+                            h,
+                            edgecolor=color,
+                            facecolor="none",
+                            linewidth=2,
+                            label=f"{label}, Conf: {conf:.2f}",
+                        )
                     )
-                )
-                ax.text(x, y, f"Tool 2, {conf:.2f}", color="blue")
-            except:
-                pass
-
-        for i, (pred, conf) in enumerate(
-            zip(tooltip_1_preds, tooltip_1_conf), start=1
-        ):
-            try:
-                x, y, w, h = pred
-                x, y, w, h = int(x), int(y), int(w), int(h)
-                ax.add_patch(
-                    matplotlib.patches.Rectangle(
-                        (x, y),
-                        w,
-                        h,
-                        edgecolor="green",
-                        facecolor="none",
-                        linewidth=2,
-                        label=f"Tooltip 1, Conf: {conf:.2f}",
-                    )
-                )
-                ax.text(x, y, f"Tooltip 1, {conf:.2f}", color="green")        
-            except:
-                pass
-
-        for i, (pred, conf) in enumerate(
-            zip(tooltip_2_preds, tooltip_2_conf), start=1
-        ):
-            try:
-                x, y, w, h = pred
-                x, y, w, h = int(x), int(y), int(w), int(h)
-                ax.add_patch(
-                    matplotlib.patches.Rectangle(
-                        (x, y),
-                        w,
-                        h,
-                        edgecolor="orange",
-                        facecolor="none",
-                        linewidth=2,
-                        label=f"Tooltip 2, Conf: {conf:.2f}",
-                    )
-                )
-                ax.text(x, y, f"Tooltip 2, {conf:.2f}", color="orange")           
-            except:
-                pass
+                    ax.text(x, y, f"{label}, {conf:.2f}", color=color)
+                except:
+                    pass
 
         if save_path:
             plt.savefig(save_path)
