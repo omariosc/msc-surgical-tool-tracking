@@ -12,26 +12,27 @@
 | 8 | Mon 5th Aug | ~~Fully labelled video 5. Ideally, out of 24 videos (107,698 images), we will have 23 semi-labelled with 1 image (1% labelled data) every 100 frames (1,048 total images), where we can employ a cross-validation split of ~80/20 (839/209) and a 2680-image test set (1 video exclusive for testing, completely labelled so that we can evaluate the model on unseen data and be confident in the result and see difference temporally).~~ |
 | 9 | Tues 6th Aug | ~~Finish labelling the training set. Apply the YOLO model as the anchor-based approach to the in-house dataset. Also perform some CV techniques to help extract the tool, e.g. background removal, test with different losses and base architecture models (ResNet instead of VGG).~~ |
 | 10 | Wed 7th Aug | ~~Ideally, development will be finished by this date, though models may still be training. Labelled tool tips in training data~~. |
-| 11 | Thurs 8th Aug | ~~Finished labelling tool tips in test data. ~~The SIMO (anchor-free model) needs to be trained on the in-house dataset and evaluated on the test set with key metrics extracted, and videos made for the presentation. Investigate differences and what is being caused in the various models. Begin writing the report with a draft abstract. |
-| 12 | Fri 9th Aug | Introduction. |
-| 13 | Sat 10th Aug | Introduction. |
-| 14 | Sun 11th Aug | Background Research. |
-| 15 | Mon 12th Aug | Background Research. |
+| 11 | Thurs 8th Aug | ~~Finished labelling tool tips in test data.~~ |
+| 12 | Fri 9th Aug | ~~The SIMO (anchor-free model) needs to be trained on the in-house dataset and evaluated on the test set with key metrics extracted, and videos made for the presentation.~~  |
+| 13 | Sat 10th Aug | Run YOLO on test set and attempt to fix tracking issues. Begin writing the report with a draft abstract and work on introduction. |
+| 14 | Sun 11th Aug | Introduction. |
+| 15 | Mon 12th Aug | Introduction. |
 | 16 | Tues 13th Aug | Background Research. |
-| 17 | Wed 14th Aug | Methodology. |
-| 18 | Thurs 15th Aug | Methodology. |
+| 17 | Wed 14th Aug | Background Research. |
+| 18 | Thurs 15th Aug | Background Research. |
 | 19 | Fri 16th Aug | Methodology. |
-| 20 | Sat 17th Aug | Results. |
-| 21 | Sun 18th Aug | Results. |
-| 22 | Mon 19th Aug | Results. |
-| 23 | Tues 20th Aug | Discussion. |
-| 24 | Wed 21st Aug | Discussion. |
+| 20 | Sat 17th Aug | Methodology. |
+| 21 | Sun 18th Aug | Methodology. |
+| 22 | Mon 19th Aug | Results (Investigate differences and what is being caused in the various SIMO and YOLO models). |
+| 23 | Tues 20th Aug | Results. |
+| 24 | Wed 21st Aug | Results. |
 | 25 | Thurs 22nd Aug | Discussion. |
 | 26 | Fri 23rd Aug | Discusion. |
-| 27 | Sat 24th Aug | LaTeX formatting for tables, figures and references. |
+| 27 | Sat 24th Aug | Discussion. |
 | 28 | Mon 26th Aug | LaTeX formatting for tables, figures and references. |
-| 29 | Tues 27th Aug | Abstract + final changes. |
-| 30 | Wed 28th Aug | Reserve day 1 for catchup + final changes. |
-| 31 | Thurs 29th Aug | Reserve day 2 for catchup + final changes. |
+| 29 | Tues 27th Aug | LaTeX formatting for tables, figures and references. |
+| 30 | Wed 28th Aug | Abstract + final changes. |
+| 31 | Thurs 29th Aug | Reserve day for catchup + final changes. |
 | 32 | Fri 30th Aug | Report deadline. |
 | 33 | Sat 31st Aug | Cleanup repository. |
+| 34 | Sun 1st Sep | Presentation. |
