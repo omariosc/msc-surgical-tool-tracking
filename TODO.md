@@ -13,10 +13,10 @@
 | 9 | Tues 6th Aug | ~~Finish labelling the training set. Apply the YOLO model as the anchor-based approach to the in-house dataset. Also perform some CV techniques to help extract the tool, e.g. background removal, test with different losses and base architecture models (ResNet instead of VGG).~~ |
 | 10 | Wed 7th Aug | ~~Ideally, development will be finished by this date, though models may still be training. Labelled tool tips in training data~~. |
 | 11 | Thurs 8th Aug | ~~Finished labelling tool tips in test data.~~ |
-| 12 | Fri 9th Aug | ~~The SIMO (anchor-free model) needs to be trained on the in-house dataset and evaluated on the test set with key metrics extracted, and videos made for the presentation.~~  |
-| 13 | Sat 10th Aug | Run YOLO on test set and attempt to fix tracking issues. Begin writing the report with a draft abstract and work on introduction. |
-| 14 | Sun 11th Aug | Introduction. |
-| 15 | Mon 12th Aug | Introduction. |
+| 12 | Fri 9th Aug | ~~Train SIMO on ART-Net dataset and implement tracking with YOLO.~~  |
+| 13 | Sat 10th Aug | ~~Run YOLO on test set and attempt to fix tracking issues. Begin writing the report with a draft abstract and work on introduction.~~ |
+| 14 | Sun 11th Aug | The SIMO (anchor-free model) needs to be trained on the in-house dataset and evaluated on the 6DOF and ART-Net test sets with key metrics extracted, and videos made for the presentation. Introduction. |
+| 15 | Mon 12th Aug | Fix YOLO tracking issue. Introduction. |
 | 16 | Tues 13th Aug | Background Research. |
 | 17 | Wed 14th Aug | Background Research. |
 | 18 | Thurs 15th Aug | Background Research. |
