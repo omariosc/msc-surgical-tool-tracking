@@ -85,13 +85,17 @@ def test(n):
     #     # stream=True,
     # )
 
+
+def track(n, show=False, save=True):
+    model = YOLOv10(f"chkpts/6DOF/v10{n}/yolov10{n}-detect-6dof/weights/best.pt")
+    model.to(device)
     model.track(
         # "D:\Data\RARP-45_train/train\Log_D2P280782_2017.11.20_12.20.03_4\DVC\EndoscopeImageMemory_0_sync.avi",
         "data/6DOF/Test 5.mp4",
         # "data/6DOF/Dataset.mp4",
         tracker="bytetrack.yaml",
-        save=True,
-        show=False,
+        save=save,
+        show=show,
         # save_dir=f"chkpts/ART/v10{n}",
         # stream=True,
     )
@@ -102,7 +106,7 @@ if __name__ == "__main__":
 
     # models = ["n", "s", "m", "b", "l", "x"]
 
-    # for m in models:
+    # # for m in models:
     m = sys.argv[1]
     # m = "x"
     # Save output to a file
@@ -121,7 +125,8 @@ if __name__ == "__main__":
     print(f"Testing model {m}")
     start = time.time()
     # Test the model
-    test(m)
+    # test(m)
+    track(m)
     end = time.time()
     print(f"Time to test model {m}: {end - start}")
 
