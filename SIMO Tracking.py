@@ -21,10 +21,29 @@ from scipy.spatial import distance
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print(f"Using device: {device}")
 
+# Configuration (Set to 'ART' or '6DOF')
+dataset_type = "ART"  # 'ART' or '6DOF'
+
+# Configure paths and model settings based on dataset type
+if dataset_type == "ART":
+    max_bboxes = 2
+    n_classes = 4
+    data_dir = "data/ART-Net"
+    output_dir = "chkpts/SIMO/ART/output"
+    weights_folder = "chkpts/SIMO/ART/weights"
+    tracking = False
+else:  # 6DOF
+    max_bboxes = 4
+    n_classes = 8
+    data_dir = "data/6DOF"
+    output_dir = "chkpts/SIMO/6DOF/output"
+    weights_folder = "chkpts/SIMO/6DOF/weights"
+    tracking = True
+
 
 # Define the ToolDataset class
 class ToolDataset(Dataset):
-    def __init__(self, image_dir, label_dir, transform=None, max_bboxes=4):
+    def __init__(self, image_dir, label_dir, transform=None, max_bboxes=2):
         self.image_dir = image_dir
         self.label_dir = label_dir
         self.transform = transform
@@ -34,7 +53,24 @@ class ToolDataset(Dataset):
             for f in os.listdir(image_dir)
             if os.path.isfile(os.path.join(image_dir, f))
             and os.path.exists(os.path.join(label_dir, f.replace(".png", ".txt")))
+            and "Neg" not in f  # Exclude negative images
         ]
+        self.image_files = sorted(
+            self.image_files, key=lambda x: int(x.split("_")[-1].split(".")[0])
+        )
+
+        # Preprocess labels during initialization
+        self.labels = []
+        for img_file in self.image_files:
+            label_file = img_file.replace(".png", ".txt")
+            label_path = os.path.join(self.label_dir, label_file)
+            if os.path.exists(label_path) and os.path.getsize(label_path) > 0:
+                labels = np.loadtxt(label_path).reshape(-1, 5)
+                labels = self.convert_labels_xywh_to_xyxy(labels)
+                labels = self.pad_labels(labels, self.max_bboxes)
+            else:
+                labels = np.zeros((self.max_bboxes, 5))  # No bounding boxes
+            self.labels.append(labels)
 
     def __len__(self):
         return len(self.image_files)
@@ -42,24 +78,10 @@ class ToolDataset(Dataset):
     def __getitem__(self, idx):
         img_name = self.image_files[idx]
         img_path = os.path.join(self.image_dir, img_name)
-        label_path = os.path.join(self.label_dir, img_name.replace(".png", ".txt"))
 
-        image = cv2.imread(img_path)
-        image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-        image = cv2.resize(image, (512, 512))  # Resize images to 512x512
-        image = image / 255.0
+        image = Image.open(img_path).convert("RGB")
 
-        # Load labels and handle cases with empty or partial labels
-        if os.path.exists(label_path) and os.path.getsize(label_path) > 0:
-            labels = np.loadtxt(label_path, delimiter=" ")
-            if labels.ndim == 1:
-                labels = labels[np.newaxis, :]
-        else:
-            labels = np.zeros((0, 5))  # No bounding boxes
-
-        # Pad labels to fixed size, ensuring 2 tools and 2 tool tips (4 total)
-        labels = self.pad_labels(labels, self.max_bboxes)
-
+        labels = self.labels[idx]
         labels = torch.tensor(labels, dtype=torch.float32)
 
         if self.transform:
@@ -75,9 +97,33 @@ class ToolDataset(Dataset):
             labels = np.vstack((labels, padding))
         return labels
 
+    def convert_labels_xywh_to_xyxy(self, labels):
+        # Convert xywh to x1y1x2y2 format
+        converted_labels = []
+        for label in labels:
+            cls, x, y, w, h = label
+            x1 = x - w / 2
+            y1 = y - h / 2
+            x2 = x + w / 2
+            y2 = y + h / 2
+            converted_labels.append([cls, x1, y1, x2, y2])
+        return np.array(converted_labels)
+
+    def convert_labels_xyxy_to_xywh(self, labels):
+        # Convert x1y1x2y2 to xywh format
+        converted_labels = []
+        for label in labels:
+            cls, x1, y1, x2, y2 = label
+            x = (x1 + x2) / 2
+            y = (y1 + y2) / 2
+            w = x2 - x1
+            h = y2 - y1
+            converted_labels.append([cls, x, y, w, h])
+        return np.array(converted_labels)
+
 
 class SIMOModel(nn.Module):
-    def __init__(self, n_classes=4, backbone="vgg"):
+    def __init__(self, n_classes, backbone="vgg"):
         super(SIMOModel, self).__init__()
 
         # Choose the backbone model
@@ -113,17 +159,28 @@ class SIMOModel(nn.Module):
 
         combined_channels = backbone_out_channels + 512  # For concatenation
 
-        # Decoder for tool and tooltip bounding box regression
-        self.tool_1_decoder = self._create_decoder(combined_channels, n_classes)
-        self.tool_2_decoder = self._create_decoder(combined_channels, n_classes)
-        self.tooltip_1_decoder = self._create_decoder(combined_channels, n_classes)
-        self.tooltip_2_decoder = self._create_decoder(combined_channels, n_classes)
+        # Decoders for tool and tooltip bounding box regression
+        self.tool_1_decoder = self._create_decoder(combined_channels, 4)
+        self.tool_2_decoder = self._create_decoder(combined_channels, 4)
+        self.tooltip_1_decoder = self._create_decoder(combined_channels, 4)
+        self.tooltip_2_decoder = self._create_decoder(combined_channels, 4)
 
         # Confidence prediction for tool and tooltip
         self.tool_1_confidence = self._create_confidence_head(combined_channels)
         self.tool_2_confidence = self._create_confidence_head(combined_channels)
         self.tooltip_1_confidence = self._create_confidence_head(combined_channels)
         self.tooltip_2_confidence = self._create_confidence_head(combined_channels)
+
+        # After creating the decoders and confidence heads in the SIMOModel class __init__ method
+        if n_classes == 4:
+            for param in self.tool_2_decoder.parameters():
+                param.requires_grad = False
+            for param in self.tooltip_2_decoder.parameters():
+                param.requires_grad = False
+            for param in self.tool_2_confidence.parameters():
+                param.requires_grad = False
+            for param in self.tooltip_2_confidence.parameters():
+                param.requires_grad = False
 
     def _create_decoder(self, combined_channels, n_classes):
         return nn.Sequential(
@@ -173,15 +230,17 @@ class SIMOModel(nn.Module):
 
         # Decoders for tools and tooltips
         tool_1_pred = self.tool_1_decoder(combined_features)
-        tool_2_pred = self.tool_2_decoder(combined_features)
         tooltip_1_pred = self.tooltip_1_decoder(combined_features)
-        tooltip_2_pred = self.tooltip_2_decoder(combined_features)
-
-        # Confidence predictions
         tool_1_conf = self.tool_1_confidence(combined_features)
-        tool_2_conf = self.tool_2_confidence(combined_features)
         tooltip_1_conf = self.tooltip_1_confidence(combined_features)
-        tooltip_2_conf = self.tooltip_2_confidence(combined_features)
+
+        if n_classes == 8:
+            tool_2_pred = self.tool_2_decoder(combined_features)
+            tooltip_2_pred = self.tooltip_2_decoder(combined_features)
+            tool_2_conf = self.tool_2_confidence(combined_features)
+            tooltip_2_conf = self.tooltip_2_confidence(combined_features)
+        else:
+            tool_2_pred, tool_2_conf, tooltip_2_pred, tooltip_2_conf = tool_1_pred, tool_1_conf, tooltip_1_pred, tooltip_1_conf
 
         return (
             tool_1_pred,
@@ -205,7 +264,7 @@ class SIMOModel(nn.Module):
         total_time = 0
         self.to(device)
         optimizer = optim.Adam(self.parameters(), lr=lr)
-        checkpoints_folder = "chkpts/SIMO/ART/weights"
+        checkpoints_folder = weights_folder
         if not os.path.exists(checkpoints_folder):
             os.makedirs(checkpoints_folder)
 
@@ -218,8 +277,11 @@ class SIMOModel(nn.Module):
             for batch, (images, labels) in enumerate(train_loader):
                 images = images.to(device).float()
 
-                # Split labels for tools and tooltips
-                tool_labels, tooltip_labels = labels[:, :2, :], labels[:, 2:, :]
+                # Split labels for tools and tooltips based on max_bboxes
+                tool_labels, tooltip_labels = (
+                    labels[:, : self.max_bboxes // 2, :],
+                    labels[:, self.max_bboxes // 2 :, :],
+                )
                 tool_labels = tool_labels.to(device).float()
                 tooltip_labels = tooltip_labels.to(device).float()
 
@@ -290,16 +352,13 @@ class SIMOModel(nn.Module):
             for images, labels in val_loader:
                 images = images.to(device).float()
 
-                # Split labels for tools and tooltips
-                tool_labels, tooltip_labels = labels[:, :2, 1:], labels[:, 2:, 1:]
-                tool_targets, tooltip_targets = labels[:, :2, 0].unsqueeze(2), labels[
-                    :, 2:, 0
-                ].unsqueeze(2)
-
+                # Split labels for tools and tooltips based on max_bboxes
+                tool_labels, tooltip_labels = (
+                    labels[:, : self.max_bboxes // 2, :],
+                    labels[:, self.max_bboxes // 2 :, :],
+                )
                 tool_labels = tool_labels.to(device).float()
                 tooltip_labels = tooltip_labels.to(device).float()
-                tool_targets = tool_targets.to(device).float()
-                tooltip_targets = tooltip_targets.to(device).float()
 
                 preds = self.forward(images)
 
@@ -337,13 +396,9 @@ class SIMOModel(nn.Module):
         """
         total_loss = 0.0
 
-        for i in range(4):  # Iterating over each tool and tooltip (total 4 pairs)
-            pred_bbox = preds[
-                2 * i
-            ]  # Bounding box prediction (tool_1_pred, tool_2_pred, ...)
-            pred_conf = preds[
-                2 * i + 1
-            ]  # Confidence prediction (tool_1_conf, tool_2_conf, ...)
+        for i in range(self.max_bboxes):
+            pred_bbox = preds[2 * i]  # Bounding box prediction
+            pred_conf = preds[2 * i + 1]  # Confidence prediction
 
             label_bbox = labels[i][
                 :, 1:
@@ -355,9 +410,8 @@ class SIMOModel(nn.Module):
             # Compute IoU loss for bounding boxes
             iou_loss_value = self.iou_loss(pred_bbox, label_bbox)
 
-            conf_loss_value = F.binary_cross_entropy_with_logits(
-                pred_conf, label_conf
-            )
+            # Compute confidence loss
+            conf_loss_value = F.binary_cross_entropy_with_logits(pred_conf, label_conf)
 
             total_loss += iou_loss_value + conf_loss_value
 
@@ -381,10 +435,10 @@ class SIMOModel(nn.Module):
         image = np.clip(image, 0, 1)
         image = (image * 255).astype(np.uint8)
 
-        tool_1_preds = tool_1_preds.cpu().numpy().T
-        tool_2_preds = tool_2_preds.cpu().numpy().T
-        tooltip_1_preds = tooltip_1_preds.cpu().numpy().T
-        tooltip_2_preds = tooltip_2_preds.cpu().numpy().T
+        tool_1_preds = tool_1_preds.cpu().numpy()
+        tool_2_preds = tool_2_preds.cpu().numpy()
+        tooltip_1_preds = tooltip_1_preds.cpu().numpy()
+        tooltip_2_preds = tooltip_2_preds.cpu().numpy()
 
         fig, ax = plt.subplots(1)
         ax.axis("off")
@@ -402,12 +456,11 @@ class SIMOModel(nn.Module):
         for preds, confs, color, label in items:
             for pred, conf in zip(preds, confs):
                 try:
-                    x, y, w, h = map(
-                        int, pred
-                    )  # Convert all values to integers at once
+                    x1, y1, x2, y2 = map(int, pred)
+                    w, h = x2 - x1, y2 - y1
                     ax.add_patch(
                         matplotlib.patches.Rectangle(
-                            (x, y),
+                            (x1, y1),
                             w,
                             h,
                             edgecolor=color,
@@ -416,9 +469,9 @@ class SIMOModel(nn.Module):
                             label=f"{label}, Conf: {conf:.2f}",
                         )
                     )
-                    ax.text(x, y, f"{label}, {conf:.2f}", color=color)
-                except:
-                    pass
+                    ax.text(x1, y1, f"{label}, {conf:.2f}", color=color)
+                except Exception as e:
+                    print(f"Error during visualization: {e}")
 
         if save_path:
             plt.savefig(save_path)
@@ -435,7 +488,9 @@ class SIMOModel(nn.Module):
         else:
             print("No best weights found.")
 
-    def compute_metrics(pred_boxes, true_boxes, conf_scores, iou_thresholds=[0.5]):
+    def compute_metrics(
+        self, pred_boxes, true_boxes, conf_scores, iou_thresholds=[0.5]
+    ):
         binary_true_boxes = []
         binary_pred_boxes = []
         valid_conf_scores = []
@@ -465,7 +520,8 @@ class SIMOModel(nn.Module):
             binary_pred_boxes = []
             for i in range(len(true_boxes)):
                 iou_scores = [
-                    self.iou(pred_boxes[i], true_boxes[j]) for j in range(len(true_boxes))
+                    self.iou(pred_boxes[i], true_boxes[j])
+                    for j in range(len(true_boxes))
                 ]
                 max_iou = max(iou_scores)
                 if max_iou > threshold:
@@ -528,18 +584,26 @@ class SIMOModel(nn.Module):
                 if tracking:
                     (
                         tool_1_pred,
+                        tool_1_conf,
                         tool_2_pred,
+                        tool_2_conf,
                         tooltip_1_pred,
+                        tooltip_1_conf,
                         tooltip_2_pred,
+                        tooltip_2_conf,
                         prev_tool_centres,
                         prev_tooltip_centres,
                     ) = self.track_objects(
                         prev_tool_centres,
                         prev_tooltip_centres,
                         tool_1_pred,
+                        tool_1_conf,
                         tool_2_pred,
+                        tool_2_conf,
                         tooltip_1_pred,
+                        tooltip_1_conf,
                         tooltip_2_pred,
+                        tooltip_2_conf,
                     )
                 self.visualize_bounding_boxes(
                     image,
@@ -608,9 +672,13 @@ class SIMOModel(nn.Module):
         prev_tool_centres,
         prev_tooltip_centres,
         tool_1_pred,
+        tool_1_conf,
         tool_2_pred,
+        tool_2_conf,
         tooltip_1_pred,
+        tooltip_1_conf,
         tooltip_2_pred,
+        tooltip_2_conf,
     ):
         try:
             # Compute centres of the predicted bounding boxes
@@ -649,23 +717,22 @@ class SIMOModel(nn.Module):
 
                     # Assign the closest previous centre to the current one
                     if len(tool_centres) == 2:
-                        tool_1_pred, tool_2_pred = (
-                            (
-                                tool_1_pred
-                                if tool_distances[0][0] < tool_distances[1][0]
-                                else tool_2_pred
-                            ),
-                            (
-                                tool_2_pred
-                                if tool_distances[0][0] < tool_distances[1][0]
-                                else tool_1_pred
-                            ),
-                        )
+                        if tool_distances[0][0] < tool_distances[1][0]:
+                            tool_1_pred, tool_2_pred = tool_1_pred, tool_2_pred
+                            tool_1_conf, tool_2_conf = tool_1_conf, tool_2_conf
+                        else:
+                            tool_1_pred, tool_2_pred = tool_2_pred, tool_1_pred
+                            tool_1_conf, tool_2_conf = tool_2_conf, tool_1_conf
                     elif len(tool_centres) == 1:
                         tool_1_pred = (
                             tool_1_pred
                             if prev_tool_centres[0] == tool_centres[0]
                             else tool_2_pred
+                        )
+                        tool_1_conf = (
+                            tool_1_conf
+                            if prev_tool_centres[0] == tool_centres[0]
+                            else tool_2_conf
                         )
 
                 if tooltip_centres:
@@ -676,23 +743,22 @@ class SIMOModel(nn.Module):
 
                     # Assign the closest previous centre to the current one
                     if len(tooltip_centres) == 2:
-                        tooltip_1_pred, tooltip_2_pred = (
-                            (
-                                tooltip_1_pred
-                                if tooltip_distances[0][0] < tooltip_distances[1][0]
-                                else tooltip_2_pred
-                            ),
-                            (
-                                tooltip_2_pred
-                                if tooltip_distances[0][0] < tooltip_distances[1][0]
-                                else tooltip_1_pred
-                            ),
-                        )
+                        if tooltip_distances[0][0] < tooltip_distances[1][0]:
+                            tooltip_1_pred, tooltip_2_pred = tooltip_1_pred, tooltip_2_pred
+                            tooltip_1_conf, tooltip_2_conf = tooltip_1_conf, tooltip_2_conf
+                        else:
+                            tooltip_1_pred, tooltip_2_pred = tooltip_2_pred, tooltip_1_pred
+                            tooltip_1_conf, tooltip_2_conf = tooltip_2_conf, tooltip_1_conf
                     elif len(tooltip_centres) == 1:
                         tooltip_1_pred = (
                             tooltip_1_pred
                             if prev_tooltip_centres[0] == tooltip_centres[0]
                             else tooltip_2_pred
+                        )
+                        tooltip_1_conf = (
+                            tooltip_1_conf
+                            if prev_tooltip_centres[0] == tooltip_centres[0]
+                            else tooltip_2_conf
                         )
 
                 prev_tool_centres = tool_centres
@@ -703,9 +769,13 @@ class SIMOModel(nn.Module):
 
         return (
             tool_1_pred,
+            tool_1_conf,
             tool_2_pred,
+            tool_2_conf,
             tooltip_1_pred,
+            tooltip_1_conf,
             tooltip_2_pred,
+            tooltip_2_conf,
             prev_tool_centres,
             prev_tooltip_centres,
         )
@@ -735,7 +805,6 @@ class SIMOModel(nn.Module):
             return iou
         except Exception as e:
             return 0.0
-
 
     def iou_loss(self, pred, target):
         """
@@ -838,39 +907,39 @@ def main():
     torch.cuda.empty_cache()
     torch.cuda.empty_cache()
 
-    # process_images(
-    #     "data/6DOF/images/val",
-    #     "data/6DOF/processed_images/val",
-    #     "data/6DOF/labels/val",
-    #     "data/6DOF/processed_labels/val",
-    # )
-
-    transform = transforms.Compose([transforms.ToTensor()])
+    transform = transforms.Compose(
+        [
+            transforms.Resize((512, 512)),
+            transforms.ToTensor(),
+        ]
+    )
 
     train_dataset = ToolDataset(
-        image_dir="data/ART-Net/images/train",
-        label_dir="data/ART-Net/labels/train",
+        image_dir=os.path.join(data_dir, "images/train"),
+        label_dir=os.path.join(data_dir, "labels/train"),
         transform=transform,
+        max_bboxes=max_bboxes,
     )
     val_dataset = ToolDataset(
-        image_dir="data/ART-Net/images/val",
-        label_dir="data/ART-Net/labels/val",
+        image_dir=os.path.join(data_dir, "images/val"),
+        label_dir=os.path.join(data_dir, "labels/val"),
         transform=transform,
+        max_bboxes=max_bboxes,
     )
 
     train_loader = DataLoader(train_dataset, batch_size=8, shuffle=True)
     val_loader = DataLoader(val_dataset, batch_size=8, shuffle=False)
 
-    model = SIMOModel(n_classes=4, backbone="vgg").to(device)
+    model = SIMOModel(n_classes=n_classes, backbone="vgg").to(device)
 
-    # model.train_model(train_loader, val_loader, num_epochs=300, lr=0.001, patience=3)
+    model.train_model(train_loader, val_loader, num_epochs=300, lr=0.001, patience=3)
 
     # Load best weights and run evaluation on validation set
-    model.load_best_weights("chkpts/SIMO/ART/weights")
+    model.load_best_weights(weights_folder)
     results = model.test(
-        input_dir="data/ART-Net/images/val",
-        output_dir="chkpts/SIMO/ART/output",
-        tracking=False,
+        input_dir=os.path.join(data_dir, "images/val"),
+        output_dir=output_dir,
+        tracking=tracking,
     )
     print(results)
 
