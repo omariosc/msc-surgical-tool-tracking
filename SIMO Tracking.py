@@ -185,14 +185,19 @@ class SIMOModel(nn.Module):
         tooltip_2_conf = self.tooltip_2_confidence(combined_features)
 
         return (
-            tool_1_pred, tool_1_conf,
-            tool_2_pred, tool_2_conf,
-            tooltip_1_pred, tooltip_1_conf,
-            tooltip_2_pred, tooltip_2_conf
+            tool_1_pred,
+            tool_1_conf,
+            tool_2_pred,
+            tool_2_conf,
+            tooltip_1_pred,
+            tooltip_1_conf,
+            tooltip_2_pred,
+            tooltip_2_conf,
         )
 
-
-    def train_model(self, train_loader, val_loader, num_epochs=300, lr=0.001, patience=3):
+    def train_model(
+        self, train_loader, val_loader, num_epochs=300, lr=0.001, patience=3
+    ):
         torch.cuda.empty_cache()
         torch.cuda.empty_cache()
 
@@ -243,6 +248,7 @@ class SIMOModel(nn.Module):
                 print(f"Batch {batch+1}/{len(train_loader)}, Loss: {loss.item()}")
                 torch.cuda.empty_cache()
                 torch.cuda.empty_cache()
+                
 
             avg_train_loss = running_loss / len(train_loader)
             train_losses.append(avg_train_loss)
@@ -288,7 +294,9 @@ class SIMOModel(nn.Module):
 
                 # Split labels for tools and tooltips
                 tool_labels, tooltip_labels = labels[:, :2, 1:], labels[:, 2:, 1:]
-                tool_targets, tooltip_targets = labels[:, :2, 0].unsqueeze(2), labels[:, 2:, 0].unsqueeze(2)
+                tool_targets, tooltip_targets = labels[:, :2, 0].unsqueeze(2), labels[
+                    :, 2:, 0
+                ].unsqueeze(2)
 
                 tool_labels = tool_labels.to(device).float()
                 tooltip_labels = tooltip_labels.to(device).float()
@@ -306,39 +314,60 @@ class SIMOModel(nn.Module):
                         tooltip_labels[:, 1],
                     ],
                 )
-                val_loss += loss.item()
+                val_loss += loss.item()                
 
             torch.cuda.empty_cache()
             torch.cuda.empty_cache()
-
+            
         end_time = time.time()
-        print(f"Time per image: {(end_time - start_time) / len(val_loader):.2f} seconds")
+        print(
+            f"Time per image: {(end_time - start_time) / len(val_loader):.2f} seconds"
+        )
 
         return val_loss / len(val_loader)
 
     def compute_losses(self, preds, labels):
+        """
+        Compute the combined loss for bounding box regression and confidence prediction.
+
+        Args:
+        - preds: List of predictions containing both bounding box coordinates and confidence scores.
+        - labels: List of labels where each entry contains the true bounding boxes and confidence scores.
+
+        Returns:
+        - total_loss: Combined loss value.
+        """
         total_loss = 0.0
-        
-        for i in range(4):  # Iterating over each tool and tooltip (total 4)
-            pred_bbox = preds[i*2]     # Bbox prediction (tool_1_pred, tool_2_pred, ...)
-            pred_conf = preds[i*2 + 1] # Conf prediction (tool_1_conf, tool_2_conf, ...)
-            
-            label_bbox = labels[i][:, 1:]  # Bounding box label
-            label_conf = labels[i][:, 0].unsqueeze(1)  # Confidence label (reshaped to match pred_conf)
-            
-            # Compute IoU loss
+
+        for i in range(4):  # Iterating over each tool and tooltip (total 4 pairs)
+            pred_bbox = preds[
+                2 * i
+            ]  # Bounding box prediction (tool_1_pred, tool_2_pred, ...)
+            pred_conf = preds[
+                2 * i + 1
+            ]  # Confidence prediction (tool_1_conf, tool_2_conf, ...)
+
+            label_bbox = labels[i][
+                :, 1:
+            ]  # Bounding box label (skip the first column which is confidence)
+            label_conf = labels[i][:, 0].unsqueeze(
+                1
+            )  # Confidence label (first column), reshape to match pred_conf
+
+            # Compute IoU loss for bounding boxes
             iou_loss_value = iou_loss(pred_bbox, label_bbox)
-            
-            # Compute Confidence loss
+
+            # Compute confidence loss
             if self.use_focal_loss:
                 conf_loss_value = focal_loss(pred_conf, label_conf)
             else:
-                conf_loss_value = F.binary_cross_entropy_with_logits(pred_conf, label_conf)
+                conf_loss_value = F.binary_cross_entropy_with_logits(
+                    pred_conf, label_conf
+                )
 
             total_loss += iou_loss_value + conf_loss_value
 
         return total_loss
-
 
     def compute_metrics(
         self,
@@ -373,37 +402,116 @@ class SIMOModel(nn.Module):
         return metrics
 
     def visualize_bounding_boxes(
-        self, image, tool_preds, tooltip_preds, save_path=None
+        self,
+        image,
+        tool_1_preds,
+        tool_1_conf,
+        tool_2_preds,
+        tool_2_conf,
+        tooltip_1_preds,
+        tooltip_1_conf,
+        tooltip_2_preds,
+        tooltip_2_conf,
+        save_path=None,
     ):
         image = image.cpu().numpy().squeeze()
         image = np.moveaxis(image, 0, -1)
         image = np.clip(image, 0, 1)
         image = (image * 255).astype(np.uint8)
 
-        tool_preds = tool_preds.cpu().numpy().squeeze()
-        tooltip_preds = tooltip_preds.cpu().numpy().squeeze()
+        tool_1_preds = tool_1_preds.cpu().numpy().T
+        tool_2_preds = tool_2_preds.cpu().numpy().T
+        tooltip_1_preds = tooltip_1_preds.cpu().numpy().T
+        tooltip_2_preds = tooltip_2_preds.cpu().numpy().T
 
         fig, ax = plt.subplots()
-        plt.axis("off")
+        ax.axis("off")
+        # Plot rectangle with class (tool or tooltip) and confidence score
+        # if error then continue
+        for i, (pred, conf) in enumerate(
+            zip(tool_1_preds, tool_1_conf), start=1
+        ):
+            try:
+                x, y, w, h = pred
+                x, y, w, h = int(x), int(y), int(w), int(h)
+                ax.add_patch(
+                    matplotlib.patches.Rectangle(
+                        (x, y),
+                        w,
+                        h,
+                        edgecolor="red",
+                        facecolor="none",
+                        linewidth=2,
+                        label=f"Tool 1, Conf: {conf:.2f}",
+                    )
+                )
+                ax.text(x, y, f"Tool 1, {conf:.2f}", color="red")
+            except:
+                pass
 
-        tool_x, tool_y, tool_w, tool_h = tool_preds
-        tooltip_x, tooltip_y, tooltip_w, tooltip_h = tooltip_preds
+        for i, (pred, conf) in enumerate(
+            zip(tool_2_preds, tool_2_conf), start=1
+        ):
+            try:
+                x, y, w, h = pred
+                x, y, w, h = int(x), int(y), int(w), int(h)
+                ax.add_patch(
+                    matplotlib.patches.Rectangle(
+                        (x, y),
+                        w,
+                        h,
+                        edgecolor="blue",
+                        facecolor="none",
+                        linewidth=2,
+                        label=f"Tool 2, Conf: {conf:.2f}",
+                    )
+                )
+                ax.text(x, y, f"Tool 2, {conf:.2f}", color="blue")
+            except:
+                pass
 
-        tool_rect = matplotlib.patches.Rectangle(
-            (tool_x, tool_y), tool_w, tool_h, edgecolor="r", facecolor="none"
-        )
-        tooltip_rect = matplotlib.patches.Rectangle(
-            (tooltip_x, tooltip_y),
-            tooltip_w,
-            tooltip_h,
-            edgecolor="g",
-            facecolor="none",
-        )
+        for i, (pred, conf) in enumerate(
+            zip(tooltip_1_preds, tooltip_1_conf), start=1
+        ):
+            try:
+                x, y, w, h = pred
+                x, y, w, h = int(x), int(y), int(w), int(h)
+                ax.add_patch(
+                    matplotlib.patches.Rectangle(
+                        (x, y),
+                        w,
+                        h,
+                        edgecolor="green",
+                        facecolor="none",
+                        linewidth=2,
+                        label=f"Tooltip 1, Conf: {conf:.2f}",
+                    )
+                )
+                ax.text(x, y, f"Tooltip 1, {conf:.2f}", color="green")        
+            except:
+                pass
 
-        ax.add_patch(tool_rect)
-        ax.add_patch(tooltip_rect)
+        for i, (pred, conf) in enumerate(
+            zip(tooltip_2_preds, tooltip_2_conf), start=1
+        ):
+            try:
+                x, y, w, h = pred
+                x, y, w, h = int(x), int(y), int(w), int(h)
+                ax.add_patch(
+                    matplotlib.patches.Rectangle(
+                        (x, y),
+                        w,
+                        h,
+                        edgecolor="orange",
+                        facecolor="none",
+                        linewidth=2,
+                        label=f"Tooltip 2, Conf: {conf:.2f}",
+                    )
+                )
+                ax.text(x, y, f"Tooltip 2, {conf:.2f}", color="orange")           
+            except:
+                pass
 
-        ax.imshow(image)
         if save_path:
             plt.savefig(save_path)
         else:
@@ -524,40 +632,31 @@ class SIMOModel(nn.Module):
             print("No best weights found.")
 
     def run_on_test_images(
-        self, test_image_folder="data/ART-Net/images/val", num_pos=20, num_neg=5
+        self,
+        test_image_folder="data/ART-Net/images/val",
+        num_pos=20,
+        num_neg=5,
+        output_dir="results/ART/SIMO",
     ):
         test_images = []
         pos_images = [
             os.path.join(test_image_folder, f)
             for f in os.listdir(test_image_folder)
-            if "Pos" in f
+            if "Pos" in f and not f.endswith("_bbox.png")
         ]
         neg_images = [
             os.path.join(test_image_folder, f)
             for f in os.listdir(test_image_folder)
-            if "Neg" in f
+            if "Neg" in f and not f.endswith("_bbox.png")
         ]
         pos_images = np.random.choice(pos_images, num_pos, replace=False).tolist()
         neg_images = np.random.choice(neg_images, num_neg, replace=False).tolist()
         test_images.extend(pos_images + neg_images)
 
-        for image_path in test_images:
-            image = Image.open(image_path)
-            image = functional.to_tensor(image)
-            image = functional.resize(image, (512, 512))
-            image = image.unsqueeze(0).to(device)
+        self.validate_on_images(test_images, output_dir)
 
-            self.eval()
-            with torch.no_grad():
-                tool_preds, tool_conf, tooltip_preds, tooltip_conf = self.forward(image)
-            self.visualize_bounding_boxes(
-                image,
-                tool_preds,
-                tooltip_preds,
-                save_path=image_path.replace(".png", "_bbox.png"),
-            )
-
-    def validate_on_images(self, val_images):
+    def validate_on_images(self, val_images, output_dir):
+        os.makedirs(output_dir, exist_ok=True)
         self.eval()
         with torch.no_grad():
             for val_image in val_images:
@@ -565,9 +664,27 @@ class SIMOModel(nn.Module):
                 image = functional.to_tensor(image)
                 image = functional.resize(image, (512, 512))
                 image = image.unsqueeze(0).to(device)
-
-                tool_preds, tool_conf, tooltip_preds, tooltip_conf = self.forward(image)
-                self.visualize_bounding_boxes(image, tool_preds, tooltip_preds)
+                (
+                    tool_1_pred,
+                    tool_1_conf,
+                    tool_2_pred,
+                    tool_2_conf,
+                    tooltip_1_pred,
+                    tooltip_1_conf,
+                    tooltip_2_pred,
+                    tooltip_2_conf,
+                ) = self.forward(image)
+                self.visualize_bounding_boxes(
+                    image,tool_1_pred,
+                    tool_1_conf,
+                    tool_2_pred,
+                    tool_2_conf,
+                    tooltip_1_pred,
+                    tooltip_1_conf,
+                    tooltip_2_pred,
+                    tooltip_2_conf,
+                    save_path=os.path.join(output_dir, os.path.basename(val_image)),
+                )
 
 
 # Define the ObjectTracker class
@@ -617,7 +734,7 @@ class ObjectTracker:
                 cost_matrix = np.zeros((len(previous_detections), len(detections)))
                 for i, prev in enumerate(previous_detections):
                     for j, detection in enumerate(detections):
-                        cost_matrix[i, j] = 1 - self.iou(prev[0], detection[0])
+                        cost_matrix[i, j] = self.iou(prev[0], detection[0])
 
                 row_ind, col_ind = linear_sum_assignment(cost_matrix)
 
@@ -635,48 +752,39 @@ class ObjectTracker:
         return self.trackers
 
 
-# Define loss functions
 def iou(pred, target, smooth=1e-6):
-    pred, target = pred.to(device), target.to(device)
-    intersection = (pred * target).sum()
-    union = pred.sum() + target.sum() - intersection
-    return (intersection + smooth) / (union + smooth)
-
-
-def iou_loss(preds, labels):
     """
-    Custom loss function to handle different sized predictions and labels.
-    Penalizes for missing predictions, unmatched labels, and negative predictions.
-
-    Args:
-        preds: Tensor of predicted bounding boxes and confidences [batch_size, 4].
-        labels: Tensor of ground truth bounding boxes and confidences [batch_size, 4].
-
-    Returns:
-        loss: Computed loss value.
+    Compute the Intersection over Union (IoU) between two sets of boxes.
     """
-    (
-        tool_1_pred,
-        tool_1_conf,
-        tool_2_pred,
-        tool_2_conf,
-        tooltip_1_pred,
-        tooltip_1_conf,
-        tooltip_2_pred,
-        tooltip_2_conf,
-    ) = preds
+    try:
+        # Calculate intersection
+        inter_xmin = torch.max(pred[:, 0], target[:, 0])
+        inter_ymin = torch.max(pred[:, 1], target[:, 1])
+        inter_xmax = torch.min(pred[:, 2], target[:, 2])
+        inter_ymax = torch.min(pred[:, 3], target[:, 3])
 
-    total_iou_loss = 0.0
+        inter_area = torch.clamp(inter_xmax - inter_xmin, min=0) * torch.clamp(
+            inter_ymax - inter_ymin, min=0
+        )
 
-    for pred, label in zip(preds, labels):
-        if label.size(0) > 0:
-            iou_loss = 1 - iou(pred, label)
-        else:
-            iou_loss = torch.tensor(0.0, device=device)
+        # Calculate union
+        pred_area = (pred[:, 2] - pred[:, 0]) * (pred[:, 3] - pred[:, 1])
+        target_area = (target[:, 2] - target[:, 0]) * (target[:, 3] - target[:, 1])
 
-        total_iou_loss += iou_loss
-        
-    return total_iou_loss
+        union_area = pred_area + target_area - inter_area
+
+        iou = (inter_area + smooth) / (union_area + smooth)
+        return iou
+    except Exception as e:
+        return 0.0
+
+
+def iou_loss(pred, target):
+    """
+    Compute IoU loss.
+    """
+    iou_score = iou(pred, target)
+    return 1 - iou_score
 
 
 class FocalLoss(nn.Module):
@@ -841,14 +949,14 @@ def main():
 
     torch.cuda.empty_cache()
     torch.cuda.empty_cache()
-    
+
     # process_images(
     #     "data/6DOF/images/val",
     #     "data/6DOF/processed_images/val",
     #     "data/6DOF/labels/val",
     #     "data/6DOF/processed_labels/val",
     # )
-    
+
     transform = transforms.Compose([transforms.ToTensor()])
 
     train_dataset = ToolDataset(
@@ -869,16 +977,16 @@ def main():
 
     model.train_model(train_loader, val_loader, num_epochs=300, lr=0.001, patience=10)
 
-    # # Load best weights and run evaluation on validation set
-    # model.load_best_weights()
-    # val_images = [
-    #     "data/ART-Net/images/train/Train_Pos_sample_0001.png",
-    #     "data/ART-Net/images/train/Train_Neg_sample_0002.png",
-    # ]
-    # model.validate_on_images(val_images)
-    # model.run_on_test_images(
-    #     test_image_folder="data/ART-Net/images/val", num_pos=20, num_neg=5
-    # )
+    # Load best weights and run evaluation on validation set
+    model.load_best_weights()
+    val_images = [
+        "data/ART-Net/images/train/Train_Pos_sample_0001.png",
+        "data/ART-Net/images/train/Train_Neg_sample_0002.png",
+    ]
+    model.validate_on_images(val_images, "results/ART/SIMO")
+    model.run_on_test_images(
+        test_image_folder="data/ART-Net/images/val", num_pos=20, num_neg=5, output_dir="results/ART/SIMO"
+    )
 
 
 if __name__ == "__main__":
