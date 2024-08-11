@@ -1,4 +1,5 @@
 import os
+import sys
 import time
 import cv2
 import json
@@ -17,12 +18,18 @@ from scipy.optimize import linear_sum_assignment
 from sklearn.metrics import precision_recall_curve, average_precision_score
 from scipy.spatial import distance
 
+TEST = False
+
 # Set device
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print(f"Using device: {device}")
 
 # Configuration (Set to 'ART' or '6DOF')
-dataset_type = "ART"  # 'ART' or '6DOF'
+dataset_type = sys.argv[1]  # 'ART' or '6DOF'
+# dataset_type = "ART"
+# Backbone is either vgg, resnet50, or resnet18
+BACKBONE = sys.argv[2] if len(sys.argv) > 2 else "vgg"
+# BACKBONE = "vgg"
 
 # Configure paths and model settings based on dataset type
 if dataset_type == "ART":
@@ -59,18 +66,27 @@ class ToolDataset(Dataset):
             self.image_files, key=lambda x: int(x.split("_")[-1].split(".")[0])
         )
 
-        # Preprocess labels during initialization
-        self.labels = []
+        # Initialize list to hold valid images and their corresponding labels
+        valid_image_files = []
+        valid_labels = []
+
+        # Process and filter labels during initialization
         for img_file in self.image_files:
             label_file = img_file.replace(".png", ".txt")
             label_path = os.path.join(self.label_dir, label_file)
             if os.path.exists(label_path) and os.path.getsize(label_path) > 0:
                 labels = np.loadtxt(label_path).reshape(-1, 5)
-                labels = self.convert_labels_xywh_to_xyxy(labels)
-                labels = self.pad_labels(labels, self.max_bboxes)
-            else:
-                labels = np.zeros((self.max_bboxes, 5))  # No bounding boxes
-            self.labels.append(labels)
+
+                # Check if labels have the required number of bounding boxes
+                if labels.shape[0] == self.max_bboxes:
+                    valid_labels.append(labels)
+                    valid_image_files.append(img_file)
+            # If label file doesn't meet the criteria, skip adding it to valid lists
+            # No need to remove files from disk
+
+        # Update image files and labels to only include valid ones
+        self.image_files = valid_image_files
+        self.labels = valid_labels
 
     def __len__(self):
         return len(self.image_files)
@@ -89,38 +105,6 @@ class ToolDataset(Dataset):
 
         return image, labels
 
-    def pad_labels(self, labels, max_bboxes):
-        if len(labels) > max_bboxes:
-            labels = labels[:max_bboxes]
-        else:
-            padding = np.zeros((max_bboxes - len(labels), 5))
-            labels = np.vstack((labels, padding))
-        return labels
-
-    def convert_labels_xywh_to_xyxy(self, labels):
-        # Convert xywh to x1y1x2y2 format
-        converted_labels = []
-        for label in labels:
-            cls, x, y, w, h = label
-            x1 = x - w / 2
-            y1 = y - h / 2
-            x2 = x + w / 2
-            y2 = y + h / 2
-            converted_labels.append([cls, x1, y1, x2, y2])
-        return np.array(converted_labels)
-
-    def convert_labels_xyxy_to_xywh(self, labels):
-        # Convert x1y1x2y2 to xywh format
-        converted_labels = []
-        for label in labels:
-            cls, x1, y1, x2, y2 = label
-            x = (x1 + x2) / 2
-            y = (y1 + y2) / 2
-            w = x2 - x1
-            h = y2 - y1
-            converted_labels.append([cls, x, y, w, h])
-        return np.array(converted_labels)
-
 
 class SIMOModel(nn.Module):
     def __init__(self, n_classes, backbone="vgg"):
@@ -132,10 +116,14 @@ class SIMOModel(nn.Module):
         if backbone == "vgg":
             self.backbone = models.vgg16(weights=models.VGG16_Weights.DEFAULT).features
             backbone_out_channels = 512
-        elif backbone == "resnet":
+        elif backbone == "resnet50":
             resnet = models.resnet50(weights=models.ResNet50_Weights.DEFAULT)
             self.backbone = nn.Sequential(*list(resnet.children())[:-2])
             backbone_out_channels = 2048
+        elif backbone == "resnet18":
+            resnet = models.resnet18(weights=models.ResNet18_Weights.DEFAULT)
+            self.backbone = nn.Sequential(*list(resnet.children())[:-2])
+            backbone_out_channels = 512
         else:
             raise ValueError("Invalid backbone. Choose 'vgg' or 'resnet'.")
 
@@ -196,7 +184,7 @@ class SIMOModel(nn.Module):
             nn.ReLU(),
             nn.BatchNorm2d(128),
             nn.Conv2d(
-                128, self.n_classes, kernel_size=1
+                128, 4, kernel_size=1
             ),  # 4 outputs for bounding box coordinates
             nn.AdaptiveAvgPool2d((1, 1)),  # Pooling to get a 1x1 output
             nn.Flatten(),  # Flatten to shape [batch_size, 4]
@@ -212,6 +200,18 @@ class SIMOModel(nn.Module):
             nn.Flatten(),
             nn.Sigmoid(),  # Confidence between 0 and 1
         )
+
+    def convert_labels_xywh_to_xyxy(self, labels):
+        # Convert xywh to x1y1x2y2 format
+        converted_labels = []
+        for label in labels:
+            x, y, w, h = label
+            x1 = x - w / 2
+            y1 = y - h / 2
+            x2 = x + w / 2
+            y2 = y + h / 2
+            converted_labels.append([x1, y1, x2, y2])
+        return torch.tensor(converted_labels, dtype=torch.float32)
 
     def forward(self, x):
         x_backbone = self.backbone(x)
@@ -318,6 +318,9 @@ class SIMOModel(nn.Module):
                 print(f"Batch {batch+1}/{len(train_loader)}, Loss: {loss.item()}")
                 torch.cuda.empty_cache()
 
+                if TEST:
+                    break
+
             avg_train_loss = running_loss / len(train_loader)
             train_losses.append(avg_train_loss)
             end_time = time.time()
@@ -345,12 +348,14 @@ class SIMOModel(nn.Module):
                     print("Early stopping")
                     break
 
+            if TEST:
+                break
+
         print(f"Total training time: {total_time:.2f} seconds")
         torch.cuda.empty_cache()
         torch.cuda.empty_cache()
 
         return train_losses, val_losses
-
 
     def validate_model(self, val_loader):
         self.eval()
@@ -389,7 +394,7 @@ class SIMOModel(nn.Module):
                             tooltip_labels[:, 1],
                         ],
                     )
-                val_loss += loss.item()
+                val_loss += loss.mean().item()
 
             torch.cuda.empty_cache()
 
@@ -403,7 +408,7 @@ class SIMOModel(nn.Module):
         Compute the combined loss for bounding box regression and confidence prediction.
 
         Args:
-        - preds: List of predictions containing both bounding box coordinates and confidence scores.
+        - preds: List of predictions containing both bounding box coordinates (in xywh) and confidence scores.
         - labels: List of labels where each entry contains the true bounding boxes and confidence scores.
 
         Returns:
@@ -412,21 +417,30 @@ class SIMOModel(nn.Module):
         total_loss = 0.0
 
         for i in range(self.max_bboxes):
-            pred_bbox = preds[2 * i]  # Bounding box prediction
+            pred_bbox_xywh = preds[2 * i]  # Bounding box prediction in xywh
             pred_conf = preds[2 * i + 1]  # Confidence prediction
 
-            label_bbox = labels[i][
-                :, 1:
-            ]  # Bounding box label (skip the first column which is confidence)
-            label_conf = labels[i][:, 0].unsqueeze(
-                1
+            if pred_bbox_xywh.shape[-1] != 4:
+                pred_bbox_xywh = pred_bbox_xywh.view(-1, 4)  # Ensure the shape is correct
+
+            # Move to CPU before converting to numpy
+            pred_bbox_xywh_cpu = pred_bbox_xywh.cpu()
+
+            # Convert pred_bbox_xywh and label_bbox from xywh to xyxy format
+            pred_bbox = self.convert_labels_xywh_to_xyxy(pred_bbox_xywh_cpu)
+            label_bbox = self.convert_labels_xywh_to_xyxy(labels[i][:, 1:].cpu())
+
+            label_conf = (
+                labels[i][:, 0].unsqueeze(1).cpu()
             )  # Confidence label (first column), reshape to match pred_conf
 
             # Compute IoU loss for bounding boxes
             iou_loss_value = self.iou_loss(pred_bbox, label_bbox)
 
             # Compute confidence loss
-            conf_loss_value = F.binary_cross_entropy_with_logits(pred_conf, label_conf)
+            conf_loss_value = F.binary_cross_entropy_with_logits(
+                pred_conf.cpu(), label_conf
+            )
 
             total_loss += iou_loss_value + conf_loss_value
 
@@ -450,15 +464,17 @@ class SIMOModel(nn.Module):
         image = np.clip(image, 0, 1)
         image = (image * 255).astype(np.uint8)
 
-        tool_1_preds = tool_1_preds.cpu().numpy()
-        tool_2_preds = tool_2_preds.cpu().numpy()
-        tooltip_1_preds = tooltip_1_preds.cpu().numpy()
-        tooltip_2_preds = tooltip_2_preds.cpu().numpy()
+        # Convert predictions from xywh to xyxy format for visualization
+        tool_1_preds = self.convert_labels_xywh_to_xyxy(tool_1_preds.cpu().numpy())
+        tool_2_preds = self.convert_labels_xywh_to_xyxy(tool_2_preds.cpu().numpy())
+        tooltip_1_preds = self.convert_labels_xywh_to_xyxy(tooltip_1_preds.cpu().numpy())
+        tooltip_2_preds = self.convert_labels_xywh_to_xyxy(tooltip_2_preds.cpu().numpy())
 
         fig, ax = plt.subplots(1)
         ax.axis("off")
         ax.imshow(image)
         fig.tight_layout(pad=0)
+        plt.subplots_adjust(left=0, right=1, top=1, bottom=0)
         # Define the data for each tool/tooltip type
         items = [
             (tool_1_preds, tool_1_conf, "red", "Tool 1"),
@@ -470,26 +486,27 @@ class SIMOModel(nn.Module):
         # Iterate through the items to add patches and labels
         for preds, confs, color, label in items:
             for pred, conf in zip(preds, confs):
-                try:
-                    x1, y1, x2, y2 = map(int, pred)
-                    w, h = x2 - x1, y2 - y1
-                    ax.add_patch(
-                        matplotlib.patches.Rectangle(
-                            (x1, y1),
-                            w,
-                            h,
-                            edgecolor=color,
-                            facecolor="none",
-                            linewidth=2,
-                            label=f"{label}, Conf: {conf:.2f}",
-                        )
+                x1, y1, x2, y2 = map(int, pred)
+                w, h = x2 - x1, y2 - y1
+                x1 *= image.shape[1]
+                x2 *= image.shape[1]
+                y1 *= image.shape[0]
+                y2 *= image.shape[0]
+                ax.add_patch(
+                    matplotlib.patches.Rectangle(
+                        (x1, y1),
+                        w,
+                        h,
+                        edgecolor=color,
+                        facecolor="none",
+                        linewidth=2,
+                        label=f"{label}, Conf: {conf.item():.2f}",
                     )
-                    ax.text(x1, y1, f"{label}, {conf:.2f}", color=color)
-                except Exception as e:
-                    print(f"Error during visualization: {e}")
+                )
+                ax.text(x1, y1, f"{label}, {conf.item():.2f}", color=color)
 
         if save_path:
-            plt.savefig(save_path)
+            plt.savefig(save_path, bbox_inches='tight', pad_inches=0)
         else:
             ax.imshow(image)
 
@@ -945,9 +962,9 @@ def main():
     train_loader = DataLoader(train_dataset, batch_size=8, shuffle=True)
     val_loader = DataLoader(val_dataset, batch_size=8, shuffle=False)
 
-    model = SIMOModel(n_classes=n_classes, backbone="vgg").to(device)
+    model = SIMOModel(n_classes=n_classes, backbone=BACKBONE).to(device)
 
-    model.train_model(train_loader, val_loader, num_epochs=300, lr=0.001, patience=3)
+    model.train_model(train_loader, val_loader, num_epochs=300, lr=0.001, patience=10)
 
     # Load best weights and run evaluation on validation set
     model.load_best_weights(weights_folder)
