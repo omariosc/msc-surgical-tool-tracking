@@ -125,6 +125,8 @@ class ToolDataset(Dataset):
 class SIMOModel(nn.Module):
     def __init__(self, n_classes, backbone="vgg"):
         super(SIMOModel, self).__init__()
+        self.n_classes = n_classes
+        self.max_bboxes = 2 if n_classes == 4 else 4
 
         # Choose the backbone model
         if backbone == "vgg":
@@ -160,10 +162,10 @@ class SIMOModel(nn.Module):
         combined_channels = backbone_out_channels + 512  # For concatenation
 
         # Decoders for tool and tooltip bounding box regression
-        self.tool_1_decoder = self._create_decoder(combined_channels, 4)
-        self.tool_2_decoder = self._create_decoder(combined_channels, 4)
-        self.tooltip_1_decoder = self._create_decoder(combined_channels, 4)
-        self.tooltip_2_decoder = self._create_decoder(combined_channels, 4)
+        self.tool_1_decoder = self._create_decoder(combined_channels)
+        self.tool_2_decoder = self._create_decoder(combined_channels)
+        self.tooltip_1_decoder = self._create_decoder(combined_channels)
+        self.tooltip_2_decoder = self._create_decoder(combined_channels)
 
         # Confidence prediction for tool and tooltip
         self.tool_1_confidence = self._create_confidence_head(combined_channels)
@@ -182,7 +184,7 @@ class SIMOModel(nn.Module):
             for param in self.tooltip_2_confidence.parameters():
                 param.requires_grad = False
 
-    def _create_decoder(self, combined_channels, n_classes):
+    def _create_decoder(self, combined_channels):
         return nn.Sequential(
             nn.Conv2d(combined_channels, 512, kernel_size=3, padding=1),
             nn.ReLU(),
@@ -194,7 +196,7 @@ class SIMOModel(nn.Module):
             nn.ReLU(),
             nn.BatchNorm2d(128),
             nn.Conv2d(
-                128, n_classes, kernel_size=1
+                128, self.n_classes, kernel_size=1
             ),  # 4 outputs for bounding box coordinates
             nn.AdaptiveAvgPool2d((1, 1)),  # Pooling to get a 1x1 output
             nn.Flatten(),  # Flatten to shape [batch_size, 4]
@@ -282,6 +284,7 @@ class SIMOModel(nn.Module):
                     labels[:, : self.max_bboxes // 2, :],
                     labels[:, self.max_bboxes // 2 :, :],
                 )
+
                 tool_labels = tool_labels.to(device).float()
                 tooltip_labels = tooltip_labels.to(device).float()
 
@@ -289,17 +292,23 @@ class SIMOModel(nn.Module):
 
                 preds = self.forward(images)
 
-                # The preds list has the order:
-                # [tool_1_pred, tool_1_conf, tool_2_pred, tool_2_conf, tooltip_1_pred, tooltip_1_conf, tooltip_2_pred, tooltip_2_conf]
-                loss = self.compute_losses(
-                    preds,
-                    [
-                        tool_labels[:, 0],
-                        tool_labels[:, 1],
-                        tooltip_labels[:, 0],
-                        tooltip_labels[:, 1],
-                    ],
-                )
+                if self.max_bboxes == 2:
+                    loss = self.compute_losses(
+                        preds[
+                            :4
+                        ],  # Only tool_1_pred, tool_1_conf, tooltip_1_pred, tooltip_1_conf
+                        [tool_labels[:, 0], tooltip_labels[:, 0]],
+                    )
+                else:
+                    loss = self.compute_losses(
+                        preds,  # All predictions for 4 bounding boxes
+                        [
+                            tool_labels[:, 0],
+                            tool_labels[:, 1],
+                            tooltip_labels[:, 0],
+                            tooltip_labels[:, 1],
+                        ],
+                    )
                 loss = loss.mean()
 
                 loss.backward()
@@ -307,7 +316,6 @@ class SIMOModel(nn.Module):
                 running_loss += loss.item()
 
                 print(f"Batch {batch+1}/{len(train_loader)}, Loss: {loss.item()}")
-                torch.cuda.empty_cache()
                 torch.cuda.empty_cache()
 
             avg_train_loss = running_loss / len(train_loader)
@@ -343,6 +351,7 @@ class SIMOModel(nn.Module):
 
         return train_losses, val_losses
 
+
     def validate_model(self, val_loader):
         self.eval()
         val_loss = 0.0
@@ -357,29 +366,35 @@ class SIMOModel(nn.Module):
                     labels[:, : self.max_bboxes // 2, :],
                     labels[:, self.max_bboxes // 2 :, :],
                 )
+
                 tool_labels = tool_labels.to(device).float()
                 tooltip_labels = tooltip_labels.to(device).float()
 
                 preds = self.forward(images)
 
-                loss = self.compute_losses(
-                    preds,
-                    [
-                        tool_labels[:, 0],
-                        tool_labels[:, 1],
-                        tooltip_labels[:, 0],
-                        tooltip_labels[:, 1],
-                    ],
-                )
+                if self.max_bboxes == 2:
+                    loss = self.compute_losses(
+                        preds[
+                            :4
+                        ],  # Only tool_1_pred, tool_1_conf, tooltip_1_pred, tooltip_1_conf
+                        [tool_labels[:, 0], tooltip_labels[:, 0]],
+                    )
+                else:
+                    loss = self.compute_losses(
+                        preds,  # All predictions for 4 bounding boxes
+                        [
+                            tool_labels[:, 0],
+                            tool_labels[:, 1],
+                            tooltip_labels[:, 0],
+                            tooltip_labels[:, 1],
+                        ],
+                    )
                 val_loss += loss.item()
 
             torch.cuda.empty_cache()
-            torch.cuda.empty_cache()
 
         end_time = time.time()
-        print(
-            f"Time per image: {(end_time - start_time) / len(val_loader):.2f} seconds"
-        )
+        print(f"Time per image: {(end_time - start_time) / len(val_loader):.2f} seconds")
 
         return val_loss / len(val_loader)
 
