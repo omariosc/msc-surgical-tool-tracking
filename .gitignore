@@ -1,13 +1,14 @@
+data/EndoVis 2015/*
+data/ART-Net/*
+data/6DOF/*
 repos/*
-frames/*
 results/*
-data/*
-data 2/*
-*.mp4
 .DS_Store
 *.pt
 tmp*
 chkpts/*
+!best.pt
 runs/
 .vscode
 preprocess.py
+*cache
