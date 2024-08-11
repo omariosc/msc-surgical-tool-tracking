@@ -17,21 +17,21 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 dataset_path = "data/6DOF/"
 
-# Create a configuration file for YOLOv10
-config_content = f"""
-datasets:
-train: ../{dataset_path}/images/final
-val: ../{dataset_path}/images/test
+# # Create a configuration file for YOLOv10
+# config_content = f"""
+# datasets:
+# train: ../{dataset_path}/images/train
+# val: ../{dataset_path}/images/val
 
-nc: 2  # number of classes
-names: ['tool', 'tip']  # class names
-"""
+# nc: 2  # number of classes
+# names: ['tool', 'tip']  # class names
+# """
 
-config_path = os.path.join("yaml/6DOF Large Training.yaml")
-with open(config_path, "w") as file:
-    file.write(config_content)
+# config_path = os.path.join("yaml/6DOF Multiclass.yaml")
+# with open(config_path, "w") as file:
+#     file.write(config_content)
 
-config_path = "yaml/6DOF Large Training.yaml"
+config_path = "yaml/6DOF Multiclass.yaml"
 # config_path_test = os.path.join(dataset_path, "data-small-test.yaml")
 # config_path_final = os.path.join(dataset_path, "data-small-final.yaml")
 # config_path_combined = os.path.join("yaml/data-combined.yaml")
@@ -64,7 +64,7 @@ def train(n):
         save_txt=True,
         optimize=True,
         amp=True,
-        patience=300,
+        patience=5,
         save_period=10,
     )
 

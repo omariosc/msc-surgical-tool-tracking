@@ -1,7 +1,0 @@
-
-datasets: 
-train: D:/Data/Combined/images/train
-val: D:/Data/Combined/images/val
-
-nc: 2  # number of classes
-names: ['tool', 'tool']  # class names
