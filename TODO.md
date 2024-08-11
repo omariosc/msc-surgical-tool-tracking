@@ -31,8 +31,8 @@
 | 27 | Sat 24th Aug | Discussion. |
 | 28 | Mon 26th Aug | LaTeX formatting for tables, figures and references. |
 | 29 | Tues 27th Aug | LaTeX formatting for tables, figures and references. |
-| 30 | Wed 28th Aug | Abstract + final changes. |
-| 31 | Thurs 29th Aug | Reserve day for catchup + final changes. |
+| 30 | Wed 28th Aug | Reserve day 1 for catchup + final changes. |
+| 31 | Thurs 29th Aug | Reserve day 2 for catchup + final changes. |
 | 32 | Fri 30th Aug | Report deadline. |
 | 33 | Sat 31st Aug | Cleanup repository. |
 | 34 | Sun 1st Sep | Presentation. |
