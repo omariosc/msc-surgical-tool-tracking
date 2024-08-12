@@ -107,81 +107,87 @@ class ToolDataset(Dataset):
 
 
 class SIMOModel(nn.Module):
-    def __init__(self, n_classes, backbone="vgg"):
+    def __init__(self, n_classes, arch="vgg"):
         super(SIMOModel, self).__init__()
         self.n_classes = n_classes
         self.max_bboxes = 2 if n_classes == 4 else 4
+        self.arch = arch
 
         # Choose the backbone model
-        if backbone == "vgg":
-            self.backbone = models.vgg16(weights=models.VGG16_Weights.DEFAULT)
-            backbone_out_features = 25088
-        elif backbone == "resnet50":
+        if arch == "vgg":
+            self.backbone = models.vgg16(weights=models.VGG16_Weights.DEFAULT).features
+            backbone_out_features = 512
+        elif arch == "resnet50":
             resnet = models.resnet50(weights=models.ResNet50_Weights.DEFAULT)
             self.backbone = nn.Sequential(*list(resnet.children())[:-1])
             backbone_out_features = 2048
-        elif backbone == "resnet18":
+        elif arch == "resnet18":
             resnet = models.resnet18(weights=models.ResNet18_Weights.DEFAULT)
             self.backbone = nn.Sequential(*list(resnet.children())[:-1])
             backbone_out_features = 512
+        elif arch == "fcn":
+            self.backbone = models.vgg16(weights=models.VGG16_Weights.DEFAULT)
+            print(self.backbone)
+            backbone_out_features = 25088
         else:
-            raise ValueError("Invalid backbone. Choose 'vgg' or 'resnet'.")
+            raise ValueError("Invalid backbone. Choose 'vgg', 'resnet18', 'resnet50' or 'fcn'.")
 
-        # Fully connected layers
-        self.fc = nn.Sequential(
-            nn.Linear(backbone_out_features, 1024),
-            nn.BatchNorm1d(1024),
-            nn.ReLU(),
-            nn.Linear(1024, 512),
-            nn.BatchNorm1d(512),
-            nn.ReLU(),
-            nn.Linear(512, max_bboxes * 5),  # Each bbox has 5 outputs: x, y, w, h, conf
-        )
+        if arch == "fcn":
+            # Fully connected layers
+            self.fc = nn.Sequential(
+                nn.Linear(backbone_out_features, 1024),
+                nn.BatchNorm1d(1024),
+                nn.ReLU(),
+                nn.Linear(1024, 512),
+                nn.BatchNorm1d(512),
+                nn.ReLU(),
+                nn.Linear(512, max_bboxes * 5),  # Each bbox has 5 outputs: x, y, w, h, conf
+            )
+        else:
+            # Freeze the backbone weights
+            for param in self.backbone.parameters():
+                param.requires_grad = False
 
-        # # Freeze the backbone weights
-        # for param in self.backbone.parameters():
-        #     param.requires_grad = False
+            # Feature representation generator (FRG)
+            self.frg = nn.Sequential(
+                nn.Conv2d(3, 64, kernel_size=3, padding=1),
+                nn.ReLU(),
+                nn.BatchNorm2d(64),
+                nn.Conv2d(64, 256, kernel_size=3, padding=1),
+                nn.ReLU(),
+                nn.BatchNorm2d(256),
+                nn.Conv2d(256, 64, kernel_size=3, padding=1),
+                nn.ReLU(),
+                nn.BatchNorm2d(64),
+                nn.Conv2d(64, 512, kernel_size=3, padding=1),
+                nn.ReLU(),
+                nn.BatchNorm2d(512),
+            )
 
-        # # Feature representation generator (FRG)
-        # self.frg = nn.Sequential(
-        #     nn.Conv2d(3, 64, kernel_size=3, padding=1),
-        #     nn.ReLU(),
-        #     nn.BatchNorm2d(64),
-        #     nn.Conv2d(64, 256, kernel_size=3, padding=1),
-        #     nn.ReLU(),
-        #     nn.BatchNorm2d(256),
-        #     nn.Conv2d(256, 64, kernel_size=3, padding=1),
-        #     nn.ReLU(),
-        #     nn.BatchNorm2d(64),
-        #     nn.Conv2d(64, 512, kernel_size=3, padding=1),
-        #     nn.ReLU(),
-        #     nn.BatchNorm2d(512),
-        # )
+            combined_channels = backbone_out_features + 512  # For concatenation
 
-        # combined_channels = backbone_out_channels + 512  # For concatenation
+            # Decoders for tool and tooltip bounding box regression
+            self.tool_1_decoder = self._create_decoder(combined_channels)
+            self.tool_2_decoder = self._create_decoder(combined_channels)
+            self.tooltip_1_decoder = self._create_decoder(combined_channels)
+            self.tooltip_2_decoder = self._create_decoder(combined_channels)
 
-        # # Decoders for tool and tooltip bounding box regression
-        # self.tool_1_decoder = self._create_decoder(combined_channels)
-        # self.tool_2_decoder = self._create_decoder(combined_channels)
-        # self.tooltip_1_decoder = self._create_decoder(combined_channels)
-        # self.tooltip_2_decoder = self._create_decoder(combined_channels)
+            # Confidence prediction for tool and tooltip
+            self.tool_1_confidence = self._create_confidence_head(combined_channels)
+            self.tool_2_confidence = self._create_confidence_head(combined_channels)
+            self.tooltip_1_confidence = self._create_confidence_head(combined_channels)
+            self.tooltip_2_confidence = self._create_confidence_head(combined_channels)
 
-        # # Confidence prediction for tool and tooltip
-        # self.tool_1_confidence = self._create_confidence_head(combined_channels)
-        # self.tool_2_confidence = self._create_confidence_head(combined_channels)
-        # self.tooltip_1_confidence = self._create_confidence_head(combined_channels)
-        # self.tooltip_2_confidence = self._create_confidence_head(combined_channels)
-
-        # # After creating the decoders and confidence heads in the SIMOModel class __init__ method
-        # if n_classes == 4:
-        #     for param in self.tool_2_decoder.parameters():
-        #         param.requires_grad = False
-        #     for param in self.tooltip_2_decoder.parameters():
-        #         param.requires_grad = False
-        #     for param in self.tool_2_confidence.parameters():
-        #         param.requires_grad = False
-        #     for param in self.tooltip_2_confidence.parameters():
-        #         param.requires_grad = False
+            # After creating the decoders and confidence heads in the SIMOModel class __init__ method
+            if n_classes == 4:
+                for param in self.tool_2_decoder.parameters():
+                    param.requires_grad = False
+                for param in self.tooltip_2_decoder.parameters():
+                    param.requires_grad = False
+                for param in self.tool_2_confidence.parameters():
+                    param.requires_grad = False
+                for param in self.tooltip_2_confidence.parameters():
+                    param.requires_grad = False
 
     def _create_decoder(self, combined_channels):
         return nn.Sequential(
@@ -225,50 +231,52 @@ class SIMOModel(nn.Module):
         return torch.tensor(converted_labels, dtype=torch.float32)
 
     def forward(self, x):
-        if hasattr(self.backbone, "avgpool"):
-            x = self.backbone.features(x)  # for vgg
-            x = self.backbone.avgpool(x)  # for vgg
-            x = torch.flatten(x, 1)
+        if self.arch == "fcn":
+            if hasattr(self.backbone, "avgpool"):
+                x = self.backbone.features(x)  # for vgg
+                x = self.backbone.avgpool(x)  # for vgg
+                x = torch.flatten(x, 1)
+            else:
+                x = self.backbone(x)  # for resnet
+                x = torch.flatten(x, 1)
+
+            x = self.fc(x)
+
+            tool_1_pred, tool_1_conf, tooltip_1_pred, tooltip_1_conf = x[:, :4], x[:, 4:5], x[:, 5:8], x[:, 8:9]
+            if self.max_bboxes == 4:
+                tool_2_pred, tool_2_conf, tooltip_2_pred, tooltip_2_conf = x[:, 9:13], x[:, 13:14], x[:, 14:17], x[:, 17:18]
+            else:
+                tool_2_pred, tool_2_conf, tooltip_2_pred, tooltip_2_conf = tool_1_pred, tool_1_conf, tooltip_1_pred, tooltip_1_conf
         else:
-            x = self.backbone(x)  # for resnet
-            x = torch.flatten(x, 1)
+            x_backbone = self.backbone(x)
 
-        x = self.fc(x)
-        # x_backbone = self.backbone(x)
+            # Feature representation generator
+            frg = self.frg(x)
 
-        # # Feature representation generator
-        # frg = self.frg(x)
+            # Resize FRG output to match backbone output size
+            frg_resized = F.interpolate(
+                frg,
+                size=(x_backbone.size(2), x_backbone.size(3)),
+                mode="bilinear",
+                align_corners=True,
+            )
 
-        # # Resize FRG output to match backbone output size
-        # frg_resized = F.interpolate(
-        #     frg,
-        #     size=(x_backbone.size(2), x_backbone.size(3)),
-        #     mode="bilinear",
-        #     align_corners=True,
-        # )
+            # Concatenate backbone and FRG outputs
+            combined_features = torch.cat((x_backbone, frg_resized), dim=1)
 
-        # # Concatenate backbone and FRG outputs
-        # combined_features = torch.cat((x_backbone, frg_resized), dim=1)
+            # Decoders for tools and tooltips
+            tool_1_pred = self.tool_1_decoder(combined_features)
+            tooltip_1_pred = self.tooltip_1_decoder(combined_features)
+            tool_1_conf = self.tool_1_confidence(combined_features)
+            tooltip_1_conf = self.tooltip_1_confidence(combined_features)
 
-        # # Decoders for tools and tooltips
-        # tool_1_pred = self.tool_1_decoder(combined_features)
-        # tooltip_1_pred = self.tooltip_1_decoder(combined_features)
-        # tool_1_conf = self.tool_1_confidence(combined_features)
-        # tooltip_1_conf = self.tooltip_1_confidence(combined_features)
-
-        # if n_classes == 8:
-        #     tool_2_pred = self.tool_2_decoder(combined_features)
-        #     tooltip_2_pred = self.tooltip_2_decoder(combined_features)
-        #     tool_2_conf = self.tool_2_confidence(combined_features)
-        #     tooltip_2_conf = self.tooltip_2_confidence(combined_features)
-        # else:
-        #     tool_2_pred, tool_2_conf, tooltip_2_pred, tooltip_2_conf = tool_1_pred, tool_1_conf, tooltip_1_pred, tooltip_1_conf
-
-        tool_1_pred, tool_1_conf, tooltip_1_pred, tooltip_1_conf = x[:, :4], x[:, 4:5], x[:, 5:8], x[:, 8:9]
-        if self.max_bboxes == 4:
-            tool_2_pred, tool_2_conf, tooltip_2_pred, tooltip_2_conf = x[:, 9:13], x[:, 13:14], x[:, 14:17], x[:, 17:18]
-        else:
-            tool_2_pred, tool_2_conf, tooltip_2_pred, tooltip_2_conf = tool_1_pred, tool_1_conf, tooltip_1_pred, tooltip_1_conf
+            if n_classes == 8:
+                tool_2_pred = self.tool_2_decoder(combined_features)
+                tooltip_2_pred = self.tooltip_2_decoder(combined_features)
+                tool_2_conf = self.tool_2_confidence(combined_features)
+                tooltip_2_conf = self.tooltip_2_confidence(combined_features)
+            else:
+                tool_2_pred, tool_2_conf, tooltip_2_pred, tooltip_2_conf = tool_1_pred, tool_1_conf, tooltip_1_pred, tooltip_1_conf
 
         return (
             tool_1_pred,
@@ -977,7 +985,7 @@ def main():
     train_loader = DataLoader(train_dataset, batch_size=8, shuffle=True)
     val_loader = DataLoader(val_dataset, batch_size=8, shuffle=False)
 
-    model = SIMOModel(n_classes=n_classes, backbone=BACKBONE).to(device)
+    model = SIMOModel(n_classes=n_classes, arch=BACKBONE).to(device)
 
     model.train_model(train_loader, val_loader, num_epochs=300, lr=0.001, patience=10)
 
