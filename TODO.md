@@ -17,8 +17,8 @@
 | 13 | Sat 10th Aug | ~~Run YOLO on test set and attempt to fix tracking issues. Begin writing the report with a draft abstract.~~ |
 | 14 | Sun 11th Aug | ~~The SIMO (anchor-free model) needs to be trained and evaluated on the ART-Net test sets with key metrics extracted.~~ |
 | 15 | Mon 12th Aug | ~~The SIMO (anchor-free model) needs to be trained and evaluated on the 6DOF test sets with key metrics extracted. Add outline document notes.~~ |
-| 16 | Tues 13th Aug  | ~~Fix YOLO tracking issue.~~ Train new SIMO model on ART-Net. Introduction. |
-| 17 | Wed 14th Aug   | Train new SIMO model on 6DOF and get tracking video.Introduction. |
+| 16 | Tues 13th Aug  | ~~Fix YOLO tracking issue. Train new SIMO model on ART-Net.~~ Introduction. |
+| 17 | Wed 14th Aug   | Train new SIMO model on 6DOF and get tracking video. Introduction. |
 | 18 | Thurs 15th Aug | Background Research. |
 | 19 | Fri 16th Aug   | Background Research. |
 | 20 | Sat 17th Aug   | Background Research. |
