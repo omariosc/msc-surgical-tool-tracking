@@ -786,30 +786,39 @@ class SIMOModel(nn.Module):
         Compute the Intersection over Union (IoU) between two sets of boxes.
         """
         cx, cy, w, h = pred[0][0], pred[0][1], pred[0][2], pred[0][3]
-        x1 = cx - w / torch.tensor(2)
-        y1 = cy - h / torch.tensor(2)
-
         target_cx, target_cy, target_w, target_h = (
             target[0][0],
             target[0][1],
             target[0][2],
             target[0][3],
         )
+        
+        x1 = cx - w / torch.tensor(2)
+        y1 = cy - h / torch.tensor(2)
+        x2 = cx + w / torch.tensor(2)
+        y2 = cy + h / torch.tensor(2)
+        
         target_x1 = target_cx - target_w / torch.tensor(2)
         target_y1 = target_cy - target_h / torch.tensor(2)
-
-        inter_area = abs(
-            torch.max(x1 + w, target_x1 + target_w) - torch.min(x1, target_x1)
-        ) * (torch.max(y1 + h, target_y1 + target_h) - torch.min(y1, target_y1))
-
-        # Calculate union
-        pred_area = w * h
-        target_area = target_w * target_h
-        union_area = pred_area + target_area - inter_area + smooth
-
+        target_x2 = target_cx + target_w / torch.tensor(2)
+        target_y2 = target_cy + target_h / torch.tensor(2)
+        
+        # Compute the intersection area
+        xA = torch.max(x1, target_x1)
+        yA = torch.max(y1, target_y1)
+        xB = torch.min(x2, target_x2)
+        yB = torch.min(y2, target_y2)
+        
+        inter_area = torch.clamp(xB - xA, min=0) * torch.clamp(yB - yA, min=0)
+        
+        # Compute the union area
+        box1_area = w * h
+        box2_area = target_w * target_h
+        union_area = box1_area + box2_area - inter_area
+        
         iou = inter_area / union_area
 
-        return iou
+        return min(1.0, iou)
 
     def iou_loss(self, pred, target):
         """
