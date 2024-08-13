@@ -15,24 +15,26 @@
 | 11 | Thurs 8th Aug | ~~Finished labelling tool tips in test data.~~ |
 | 12 | Fri 9th Aug | ~~Train SIMO on ART-Net dataset and implement tracking with YOLO.~~ |
 | 13 | Sat 10th Aug | ~~Run YOLO on test set and attempt to fix tracking issues. Begin writing the report with a draft abstract.~~ |
-| 14 | Sun 11th Aug | ~~The SIMO (anchor-free model) needs to be trained on the in-house dataset and evaluated on the 6DOF and ART-Net test sets with key metrics extracted. Add outline document notes.~~ |
-| 15 | Mon 12th Aug | Train new SIMO models and get tracking video for 6DOF. Fix YOLO tracking issue. Introduction. |
-| 16 | Tues 13th Aug | Background Research. |
-| 17 | Wed 14th Aug | Background Research. |
+| 14 | Sun 11th Aug | ~~The SIMO (anchor-free model) needs to be trained and evaluated on the ART-Net test sets with key metrics extracted.~~ |
+| 15 | Mon 12th Aug | ~~The SIMO (anchor-free model) needs to be trained and evaluated on the 6DOF test sets with key metrics extracted. Add outline document notes.~~ |
+| 16 | Tues 13th Aug  | ~~Fix YOLO tracking issue.~~ Train new SIMO model on ART-Net. Introduction. |
+| 17 | Wed 14th Aug   | Train new SIMO model on 6DOF and get tracking video.Introduction. |
 | 18 | Thurs 15th Aug | Background Research. |
-| 19 | Fri 16th Aug | Methodology. |
-| 20 | Sat 17th Aug | Methodology. |
-| 21 | Sun 18th Aug | Methodology. |
-| 22 | Mon 19th Aug | Results (Investigate differences and what is being caused in the various SIMO and YOLO models). |
-| 23 | Tues 20th Aug | Results. |
-| 24 | Wed 21st Aug | Results. |
-| 25 | Thurs 22nd Aug | Discussion. |
-| 26 | Fri 23rd Aug | Discusion. |
-| 27 | Sat 24th Aug | Discussion. |
-| 28 | Mon 26th Aug | LaTeX formatting for tables, figures and references. |
-| 29 | Tues 27th Aug | LaTeX formatting for tables, figures and references. |
-| 30 | Wed 28th Aug | Reserve day 1 for catchup + final changes. |
+| 19 | Fri 16th Aug   | Background Research. |
+| 20 | Sat 17th Aug   | Background Research. |
+| 21 | Sun 18th Aug   | Methodology. |
+| 22 | Mon 19th Aug   | Methodology. |
+| 23 | Tues 20th Aug  | Methodology. |
+| 24 | Wed 21st Aug   | Results. |
+| 25 | Thurs 22nd Aug | Results. |
+| 26 | Fri 23rd Aug   | Results. |
+| 27 | Sat 24th Aug   | Discussion. |
+| 28 | Mon 26th Aug   | Discusion. |
+| 29 | Tues 27th Aug  | Discussion. |
+| 30 | Wed 28th Aug   | Reserve day 1 for catchup + final changes. |
 | 31 | Thurs 29th Aug | Reserve day 2 for catchup + final changes. |
 | 32 | Fri 30th Aug | Report deadline. |
 | 33 | Sat 31st Aug | Cleanup repository. |
-| 34 | Sun 1st Sep | Presentation. |
+| 34 | Sun 1st Sep  | Presentation. |
+
+https://sh-tsang.medium.com/review-detrs-beat-yolos-on-real-time-object-detection-9d10b5bccf9b
