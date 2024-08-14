@@ -120,7 +120,7 @@ class SIMOModel(nn.Module):
             resnet = models.resnet18(weights=models.ResNet18_Weights.DEFAULT)
             self.backbone = nn.Sequential(*list(resnet.children())[:-1])
             backbone_out_features = 512
-        elif arch == "fcn":
+        elif arch == "fcn-vgg":
             self.backbone = models.vgg16(weights=models.VGG16_Weights.DEFAULT)
             # resnet = models.resnet50(weights=models.ResNet50_Weights.DEFAULT)
             # self.backbone = nn.Sequential(*list(resnet.children())[:-1])
@@ -130,7 +130,7 @@ class SIMOModel(nn.Module):
                 "Invalid backbone. Choose 'vgg', 'resnet18', 'resnet50' or 'fcn'."
             )
 
-        if arch == "fcn":
+        if arch == "fcn-vgg":
             # Fully connected layers
             self.fc = nn.Sequential(
                 nn.Linear(backbone_out_features, 2048),
@@ -211,7 +211,7 @@ class SIMOModel(nn.Module):
         return torch.tensor(converted_labels, dtype=torch.float32)
 
     def forward(self, x):
-        if self.arch == "fcn":
+        if self.arch == "fcn-vgg":
             if hasattr(self.backbone, "avgpool"):
                 x = self.backbone.features(x)  # for vgg
                 x = self.backbone.avgpool(x)  # for vgg
@@ -639,7 +639,6 @@ class SIMOModel(nn.Module):
                 else:
                     all_tooltip_labels.extend(labels[:, 1, :].cpu().numpy())
 
-                
                 # Compute temp metrics in this batch only
                 (
                     temp_precisions_tool,
@@ -828,7 +827,7 @@ class SIMOModel(nn.Module):
         inter_area = torch.max(torch.tensor(0), xB - xA) * torch.max(
             torch.tensor(0), yB - yA
         )
-        
+
         # Compute the union area
         box1_area = w * h
         box2_area = target_w * target_h
