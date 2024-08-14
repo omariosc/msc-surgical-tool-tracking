@@ -1,5 +1,4 @@
 import os
-from re import T
 import sys
 import time
 import cv2
@@ -13,7 +12,6 @@ from torchvision import transforms, models
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
-from sklearn.metrics import precision_recall_curve, average_precision_score
 
 
 # Set device
@@ -135,14 +133,17 @@ class SIMOModel(nn.Module):
         if arch == "fcn":
             # Fully connected layers
             self.fc = nn.Sequential(
-                nn.Linear(backbone_out_features, 1024),
+                nn.Linear(backbone_out_features, 2048),
+                nn.BatchNorm1d(2048),
+                nn.ReLU(),
+                # dropout
+                nn.Dropout(0.2),
+                nn.Linear(2048, 1024),
                 nn.BatchNorm1d(1024),
                 nn.ReLU(),
-                nn.Linear(1024, 512),
-                nn.BatchNorm1d(512),
-                nn.ReLU(),
+                nn.Dropout(0.2),
                 nn.Linear(
-                    512, self.max_bboxes * 4
+                    1024, self.max_bboxes * 4
                 ),  # Each bbox has 5 outputs: x, y, w, h
             )
         else:
@@ -223,7 +224,7 @@ class SIMOModel(nn.Module):
 
             tool_1_pred, tooltip_1_pred = (x[:, :4], x[:, 4:8])
             if self.max_bboxes == 4:
-                tool_2_pred, tooltip_2_pred = (x[:, 10:14], x[:, 14:19])
+                tool_2_pred, tooltip_2_pred = (x[:, 8:12], x[:, 12:])
             else:
                 tool_2_pred, tooltip_2_pred = tool_1_pred, tooltip_1_pred
         else:
@@ -429,7 +430,7 @@ class SIMOModel(nn.Module):
         total_loss = 0.0
 
         for i, pred_bbox_xywh in enumerate(preds):
-            if pred_bbox_xywh.shape[-1] != 4:
+            if pred_bbox_xywh.shape[-1] != 4 and pred_bbox_xywh.shape[0] == 4:
                 try:
                     pred_bbox_xywh = pred_bbox_xywh.view(
                         -1, 4
@@ -441,10 +442,13 @@ class SIMOModel(nn.Module):
 
             # Compute IoU loss for bounding boxes
             iou_loss_value = self.iou_loss(pred_bbox_xywh, labels[i][:, 1:])
+            if pred_bbox_xywh.shape == labels[i][:, 1:].shape:
+                mse_loss = F.mse_loss(pred_bbox_xywh, labels[i][:, 1:])
 
-            mse_loss = F.mse_loss(pred_bbox_xywh, labels[i][:, 1:])
-
-            total_loss += iou_loss_value + mse_loss
+            try:
+                total_loss += iou_loss_value + mse_loss
+            except:
+                total_loss += iou_loss_value.mean() + mse_loss.mean()
 
         if TEST:
             print(f"IOU Loss: {iou_loss_value}, MSE Loss: {mse_loss}")
@@ -821,8 +825,11 @@ class SIMOModel(nn.Module):
         xB = torch.min(x2, target_x2)
         yB = torch.min(y2, target_y2)
 
-        inter_area = torch.clamp(xB - xA, min=0) * torch.clamp(yB - yA, min=0)
-
+        # compute intersection area centered at target box
+        inter_area = torch.max(torch.tensor(0), xB - xA) * torch.max(
+            torch.tensor(0), yB - yA
+        )
+        
         # Compute the union area
         box1_area = w * h
         box2_area = target_w * target_h
@@ -830,7 +837,7 @@ class SIMOModel(nn.Module):
 
         iou = inter_area / union_area
 
-        return min(1.0, iou)
+        return iou.clamp(min=0, max=1 - smooth)
 
     def iou_loss(self, pred, target):
         """
@@ -1028,7 +1035,6 @@ def main():
     val_loader = DataLoader(val_dataset, batch_size=8, shuffle=False)
 
     model = SIMOModel(max_bboxes=max_bboxes, arch=BACKBONE).to(device)
-    model.load_best_weights(weights_folder)
     
     train_losses, val_losses = model.train_model(train_loader, val_loader, num_epochs=500, lr=0.00001, patience=10)
 
