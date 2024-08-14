@@ -18,8 +18,8 @@
 | 14 | Sun 11th Aug | ~~The SIMO (anchor-free model) needs to be trained and evaluated on the ART-Net test sets with key metrics extracted.~~ |
 | 15 | Mon 12th Aug | ~~The SIMO (anchor-free model) needs to be trained and evaluated on the 6DOF test sets with key metrics extracted. Add outline document notes.~~ |
 | 16 | Tues 13th Aug  | ~~Fix YOLO tracking issue. Train new SIMO model on ART-Net, 6DOF and obtained tracking videos.~~ |
-| 17 | Wed 14th Aug   | ~~Generated all annotations using Yolov10X.~~ Ran SIMO FCN and FCN-ResNet50 on 6DOF and YOLOv8 models on 6DOF and ART-Net. Introduction. |
-| 18 | Thurs 15th Aug | Background Research. |
+| 17 | Wed 14th Aug   | ~~Generated all annotations using Yolov10X.~~ Ran SIMO FCN on 6DOF and ~~YOLOv8 models on 6DOF and ART-Net.~~ Introduction. |
+| 18 | Thurs 15th Aug | Create table of results. Run EfficientNet, RetinaNet (with and without anchor-box optimisation), DETR on 6DOF and ART-Net. Background Research. |
 | 19 | Fri 16th Aug   | Background Research. |
 | 20 | Sat 17th Aug   | Background Research. |
 | 21 | Sun 18th Aug   | Methodology. |
