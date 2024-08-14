@@ -121,10 +121,10 @@ class SIMOModel(nn.Module):
             self.backbone = nn.Sequential(*list(resnet.children())[:-1])
             backbone_out_features = 512
         elif arch == "fcn":
-            # self.backbone = models.vgg16(weights=models.VGG16_Weights.DEFAULT)
-            resnet = models.resnet50(weights=models.ResNet50_Weights.DEFAULT)
-            self.backbone = nn.Sequential(*list(resnet.children())[:-1])
-            backbone_out_features = 2048 # 25088
+            self.backbone = models.vgg16(weights=models.VGG16_Weights.DEFAULT)
+            # resnet = models.resnet50(weights=models.ResNet50_Weights.DEFAULT)
+            # self.backbone = nn.Sequential(*list(resnet.children())[:-1])
+            backbone_out_features = 25088 # 2048
         else:
             raise ValueError(
                 "Invalid backbone. Choose 'vgg', 'resnet18', 'resnet50' or 'fcn'."
@@ -639,29 +639,28 @@ class SIMOModel(nn.Module):
                 else:
                     all_tooltip_labels.extend(labels[:, 1, :].cpu().numpy())
 
-                if TEST:
-                    # Compute temp metrics in this batch only
-                    (
-                        temp_precisions_tool,
-                        temp_recalls_tool,
-                        temp_mAP_50_tool,
-                        temp_mAP_50_95_tool,
-                    ) = self.compute_metrics(all_tool_preds[-2:], all_tool_labels[-2:])
-                    print(
-                        f"Tool: Precision: {temp_precisions_tool}, Recall: {temp_recalls_tool}, mAP@0.5: {temp_mAP_50_tool}, mAP@0.5:0.95: {temp_mAP_50_95_tool}"
-                    )
-                    (
-                        temp_precisions_tooltip,
-                        temp_recalls_tooltip,
-                        temp_mAP_50_tooltip,
-                        temp_mAP_50_95_tooltip,
-                    ) = self.compute_metrics(
-                        all_tooltip_preds[-2:], all_tooltip_labels[-2:]
-                    )
-                    print(
-                        f"Tooltip: Precision: {temp_precisions_tooltip}, Recall: {temp_recalls_tooltip}, mAP@0.5: {temp_mAP_50_tooltip}, mAP@0.5:0.95: {temp_mAP_50_95_tooltip}"
-                    )
-                    break
+                
+                # Compute temp metrics in this batch only
+                (
+                    temp_precisions_tool,
+                    temp_recalls_tool,
+                    temp_mAP_50_tool,
+                    temp_mAP_50_95_tool,
+                ) = self.compute_metrics(all_tool_preds[-2:], all_tool_labels[-2:])
+                print(
+                    f"Tool: Precision: {temp_precisions_tool}, Recall: {temp_recalls_tool}, mAP@0.5: {temp_mAP_50_tool}, mAP@0.5:0.95: {temp_mAP_50_95_tool}"
+                )
+                (
+                    temp_precisions_tooltip,
+                    temp_recalls_tooltip,
+                    temp_mAP_50_tooltip,
+                    temp_mAP_50_95_tooltip,
+                ) = self.compute_metrics(
+                    all_tooltip_preds[-2:], all_tooltip_labels[-2:]
+                )
+                print(
+                    f"Tooltip: Precision: {temp_precisions_tooltip}, Recall: {temp_recalls_tooltip}, mAP@0.5: {temp_mAP_50_tooltip}, mAP@0.5:0.95: {temp_mAP_50_95_tooltip}"
+                )
 
             # Compute metrics for tools
             precisions_tool, recalls_tool, mAP_50_tool, mAP_50_95_tool = (
