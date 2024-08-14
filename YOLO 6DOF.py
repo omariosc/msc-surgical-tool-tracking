@@ -44,7 +44,7 @@ config_path = "yaml/6DOF Multiclass.yaml"
 def train(n):
     # Load a pre-trained YOLOv8 model
     # model = YOLO("chkpts/YOLOv8/yolov8x-seg.pt")
-    model = YOLOv10(f"chkpts/ART/v10{n}/yolov10{n}-detect-art/weights/best.pt")
+    model = YOLO(f"yolov8{n}.pt")
     # model = YOLOv10(f"chkpts/ART/yolov10{n}-detect-art/weights/last.pt")
     # Put model on GPU
     model.to(device)
@@ -56,20 +56,20 @@ def train(n):
         imgsz=640,
         # resume=True,
         # single_cls=True,
-        save_dir=f"chkpts/6DOF/v10{n}",
-        project=f"chkpts/6DOF/v10{n}",
-        name=f"yolov10{n}-detect-6dof",
+        save_dir=f"chkpts/6DOF/v8{n}",
+        project=f"chkpts/6DOF/v8{n}",
+        name=f"yolov8{n}-detect-6dof",
         save_conf=True,
         save_crop=True,
         save_txt=True,
         optimize=True,
         amp=True,
-        patience=5,
-        save_period=10,
+        patience=10,
+        save_period=1,
     )
 
 def test(n):
-    model = YOLOv10(f"chkpts/6DOF/v10{n}/yolov10{n}-detect-6dof/weights/best.pt")
+    model = YOLO(f"chkpts/6DOF/v8{n}/yolov8{n}-detect-6dof/weights/best.pt")
     model.to(device)
     results = model.val(data=config_path)
     print(results.results_dict)
@@ -82,7 +82,7 @@ def test(n):
 
 
 def track(n, show=False, save=True):
-    model = YOLOv10(f"chkpts/6DOF/v10{n}/yolov10{n}-detect-6dof/weights/best.pt")
+    model = YOLO(f"chkpts/6DOF/v8{n}/yolov8{n}-detect-6dof/weights/best.pt")
     model.to(device)
     # model.track(
     #     "data/6DOF/Dataset.mp4",
@@ -112,7 +112,7 @@ if __name__ == "__main__":
     # m = "x"
     # Save output to a file
     orig_stdout = sys.stdout
-    f = open(f"chkpts/6DOF/v10{m}/yolov10{m}-train-out.txt", "w")
+    f = open(f"chkpts/6DOF/v8{m}/yolov8{m}-train-out.txt", "w")
     sys.stdout = f
 
     # Log time to train
