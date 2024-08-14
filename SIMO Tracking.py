@@ -123,9 +123,10 @@ class SIMOModel(nn.Module):
             self.backbone = nn.Sequential(*list(resnet.children())[:-1])
             backbone_out_features = 512
         elif arch == "fcn":
-            self.backbone = models.vgg16(weights=models.VGG16_Weights.DEFAULT)
-            print(self.backbone)
-            backbone_out_features = 25088
+            # self.backbone = models.vgg16(weights=models.VGG16_Weights.DEFAULT)
+            resnet = models.resnet50(weights=models.ResNet50_Weights.DEFAULT)
+            self.backbone = nn.Sequential(*list(resnet.children())[:-1])
+            backbone_out_features = 2048 # 25088
         else:
             raise ValueError(
                 "Invalid backbone. Choose 'vgg', 'resnet18', 'resnet50' or 'fcn'."
@@ -322,7 +323,7 @@ class SIMOModel(nn.Module):
                 optimizer.step()
                 running_loss += loss.item()
 
-                print(f"Batch {batch+1}/{len(train_loader)}, Loss: {loss.item()}")
+                # print(f"Batch {batch+1}/{len(train_loader)}, Loss: {loss.item()}")
                 torch.cuda.empty_cache()
                 torch.cuda.empty_cache()
 
@@ -493,13 +494,13 @@ class SIMOModel(nn.Module):
             w *= image.shape[1]
             h *= image.shape[0]
             # if tool is outside image skip
-            if (
-                x1 < 0
-                or y1 < 0
-                or x1 + w > image.shape[1]
-                or y1 + h > image.shape[0]
-            ):
-                continue
+            # if (
+            #     x1 < 0
+            #     or y1 < 0
+            #     or x1 + w > image.shape[1]
+            #     or y1 + h > image.shape[0]
+            # ):
+            #     continue
             ax.add_patch(
                 matplotlib.patches.Rectangle(
                     (x1, y1),
@@ -785,37 +786,48 @@ class SIMOModel(nn.Module):
         """
         Compute the Intersection over Union (IoU) between two sets of boxes.
         """
-        cx, cy, w, h = pred[0][0], pred[0][1], pred[0][2], pred[0][3]
-        target_cx, target_cy, target_w, target_h = (
-            target[0][0],
-            target[0][1],
-            target[0][2],
-            target[0][3],
-        )
-        
+        try:
+            cx, cy, w, h = pred[0][0], pred[0][1], pred[0][2], pred[0][3]
+        except:
+            cx, cy, w, h = pred[0], pred[1], pred[2], pred[3]
+        try:    
+            target_cx, target_cy, target_w, target_h = (
+                target[0][0],
+                target[0][1],
+                target[0][2],
+                target[0][3],
+            )
+        except:
+            target_cx, target_cy, target_w, target_h = (
+                target[0],
+                target[1],
+                target[2],
+                target[3],
+            )
+
         x1 = cx - w / torch.tensor(2)
         y1 = cy - h / torch.tensor(2)
         x2 = cx + w / torch.tensor(2)
         y2 = cy + h / torch.tensor(2)
-        
+
         target_x1 = target_cx - target_w / torch.tensor(2)
         target_y1 = target_cy - target_h / torch.tensor(2)
         target_x2 = target_cx + target_w / torch.tensor(2)
         target_y2 = target_cy + target_h / torch.tensor(2)
-        
+
         # Compute the intersection area
         xA = torch.max(x1, target_x1)
         yA = torch.max(y1, target_y1)
         xB = torch.min(x2, target_x2)
         yB = torch.min(y2, target_y2)
-        
+
         inter_area = torch.clamp(xB - xA, min=0) * torch.clamp(yB - yA, min=0)
-        
+
         # Compute the union area
         box1_area = w * h
         box2_area = target_w * target_h
         union_area = box1_area + box2_area - inter_area
-        
+
         iou = inter_area / union_area
 
         return min(1.0, iou)
@@ -981,6 +993,21 @@ def main():
         [
             transforms.Resize((512, 512)),
             transforms.ToTensor(),
+            transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
+            transforms.RandomHorizontalFlip(p=0.5),
+            transforms.RandomAffine(degrees=0, translate=(0.1, 0.1)),
+            transforms.RandomRotation(degrees=45),
+            transforms.ColorJitter(
+                brightness=0.5, contrast=0.5, saturation=0.5, hue=0.5
+            ),
+            transforms.RandomResizedCrop(512, scale=(0.5, 1.0)),
+            transforms.RandomAffine(degrees=0, shear=45),
+        ]
+    )
+    validation_transform = transforms.Compose(
+        [
+            transforms.Resize((512, 512)),
+            transforms.ToTensor()
         ]
     )
 
@@ -993,7 +1020,7 @@ def main():
     val_dataset = ToolDataset(
         image_dir=os.path.join(data_dir, "images/val"),
         label_dir=os.path.join(data_dir, "labels/val"),
-        transform=transform,
+        transform=validation_transform,
         max_bboxes=max_bboxes,
     )
 
@@ -1001,9 +1028,10 @@ def main():
     val_loader = DataLoader(val_dataset, batch_size=8, shuffle=False)
 
     model = SIMOModel(max_bboxes=max_bboxes, arch=BACKBONE).to(device)
-
-    train_losses, val_losses = model.train_model(train_loader, val_loader, num_epochs=300, lr=0.001, patience=10)
+    model.load_best_weights(weights_folder)
     
+    train_losses, val_losses = model.train_model(train_loader, val_loader, num_epochs=500, lr=0.00001, patience=10)
+
     # Plot training and validation losses
     plt.plot(train_losses, label="Train Loss")
     plt.plot(val_losses, label="Validation Loss")
