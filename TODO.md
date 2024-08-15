@@ -19,20 +19,20 @@
 | 15 | Mon 12th Aug | ~~The SIMO (anchor-free model) needs to be trained and evaluated on the 6DOF test sets with key metrics extracted. Add outline document notes.~~ |
 | 16 | Tues 13th Aug  | ~~Fix YOLO tracking issue. Train new SIMO model on ART-Net, 6DOF and obtained tracking videos.~~ |
 | 17 | Wed 14th Aug   | ~~Generated all annotations using Yolov10X. Create table of results. YOLOv8 models on 6DOF.~~ |
-| 18 | Thurs 15th Aug | ~~Processed annotations for RetinaNet anchor-box optimisation. YOLOv8 models on ART-Net.~~ Run SIMO FCN on 6DOF. Introduction. |
-| 19 | Fri 16th Aug   | Run RetinaNet (with and without anchor-box optimisation) on 6DOF and ART-Net. Background Research. |
-| 20 | Sat 17th Aug   | Run EfficientNet, DETR on 6DOF and ART-Net. Background Research. |
-| 21 | Sun 18th Aug   | Run SIMO ResNet on 6DOF and ART-Net. Background Research. |
-| 22 | Mon 19th Aug   | Methodology. |
-| 23 | Tues 20th Aug  | Methodology. |
+| 18 | Thurs 15th Aug | ~~Processed annotations for RetinaNet anchor-box optimisation. YOLOv8 models on ART-Net. Run RetinaNet (with and without anchor-box optimisation) and DETR on 6DOF and ART-Net.~~ |
+| 19 | Fri 16th Aug   | Run remaining SIMO models. Introduction. |
+| 20 | Sat 17th Aug   | Run EfficientNet on 6DOF and ART-Net. Introduction. |
+| 21 | Sun 18th Aug   | Background Research. |
+| 22 | Mon 19th Aug   | Background Research. |
+| 23 | Tues 20th Aug  | Background Research. |
 | 24 | Wed 21st Aug   | Methodology. |
-| 25 | Thurs 22nd Aug | Results. |
-| 26 | Fri 23rd Aug   | Results. |
+| 25 | Thurs 22nd Aug | Methodology. |
+| 26 | Fri 23rd Aug   | Methodology. |
 | 27 | Sat 24th Aug   | Results. |
-| 28 | Mon 26th Aug   | Discussion. |
-| 29 | Tues 27th Aug  | Discusion. |
-| 30 | Wed 28th Aug   | Discussion. |
-| 31 | Thurs 29th Aug | Reserve day for catchup + final changes. |
+| 28 | Mon 26th Aug   | Results. |
+| 29 | Tues 27th Aug  | Discussion. |
+| 30 | Wed 28th Aug   | Discusion. |
+| 31 | Thurs 29th Aug | Discussion. |
 | 32 | Fri 30th Aug | Report deadline. |
 | 33 | Sat 31st Aug | Cleanup repository. |
 | 34 | Sun 1st Sep  | Presentation. |
