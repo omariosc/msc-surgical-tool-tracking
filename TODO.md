@@ -20,8 +20,8 @@
 | 16 | Tues 13th Aug  | ~~Fix YOLO tracking issue. Train new SIMO model on ART-Net, 6DOF and obtained tracking videos.~~ |
 | 17 | Wed 14th Aug   | ~~Generated all annotations using Yolov10X. Create table of results. YOLOv8 models on 6DOF.~~ |
 | 18 | Thurs 15th Aug | ~~Processed annotations for RetinaNet anchor-box optimisation. YOLOv8 models on ART-Net.~~ Run SIMO FCN on 6DOF. Introduction. |
-| 19 | Fri 16th Aug   | Background Research. |
-| 20 | Sat 17th Aug   | Run EfficientNet, RetinaNet (with and without anchor-box optimisation), DETR on 6DOF and ART-Net. Background Research. |
+| 19 | Fri 16th Aug   | Run RetinaNet (with and without anchor-box optimisation) on 6DOF and ART-Net. Background Research. |
+| 20 | Sat 17th Aug   | Run EfficientNet, DETR on 6DOF and ART-Net. Background Research. |
 | 21 | Sun 18th Aug   | Run SIMO ResNet on 6DOF and ART-Net. Background Research. |
 | 22 | Mon 19th Aug   | Methodology. |
 | 23 | Tues 20th Aug  | Methodology. |
