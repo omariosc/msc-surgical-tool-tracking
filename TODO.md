@@ -18,21 +18,21 @@
 | 14 | Sun 11th Aug | ~~The SIMO (anchor-free model) needs to be trained and evaluated on the ART-Net test sets with key metrics extracted.~~ |
 | 15 | Mon 12th Aug | ~~The SIMO (anchor-free model) needs to be trained and evaluated on the 6DOF test sets with key metrics extracted. Add outline document notes.~~ |
 | 16 | Tues 13th Aug  | ~~Fix YOLO tracking issue. Train new SIMO model on ART-Net, 6DOF and obtained tracking videos.~~ |
-| 17 | Wed 14th Aug   | ~~Generated all annotations using Yolov10X.~~ Ran SIMO FCN on 6DOF and ~~YOLOv8 models on 6DOF and ART-Net.~~ Introduction. |
-| 18 | Thurs 15th Aug | Create table of results. Run EfficientNet, RetinaNet (with and without anchor-box optimisation), DETR on 6DOF and ART-Net. Background Research. |
+| 17 | Wed 14th Aug   | ~~Generated all annotations using Yolov10X. Create table of results. YOLOv8 models on 6DOF and ART-Net.~~ |
+| 18 | Thurs 15th Aug | Run SIMO FCN on 6DOF. Run EfficientNet, RetinaNet (with and without anchor-box optimisation), DETR on 6DOF and ART-Net. Introduction. |
 | 19 | Fri 16th Aug   | Background Research. |
 | 20 | Sat 17th Aug   | Background Research. |
-| 21 | Sun 18th Aug   | Methodology. |
+| 21 | Sun 18th Aug   | Run SIMO ResNet on 6DOF and ART-Net. Background Research. |
 | 22 | Mon 19th Aug   | Methodology. |
 | 23 | Tues 20th Aug  | Methodology. |
-| 24 | Wed 21st Aug   | Results. |
+| 24 | Wed 21st Aug   | Methodology. |
 | 25 | Thurs 22nd Aug | Results. |
 | 26 | Fri 23rd Aug   | Results. |
-| 27 | Sat 24th Aug   | Discussion. |
-| 28 | Mon 26th Aug   | Discusion. |
-| 29 | Tues 27th Aug  | Discussion. |
-| 30 | Wed 28th Aug   | Reserve day 1 for catchup + final changes. |
-| 31 | Thurs 29th Aug | Reserve day 2 for catchup + final changes. |
+| 27 | Sat 24th Aug   | Results. |
+| 28 | Mon 26th Aug   | Discussion. |
+| 29 | Tues 27th Aug  | Discusion. |
+| 30 | Wed 28th Aug   | Discussion. |
+| 31 | Thurs 29th Aug | Reserve day for catchup + final changes. |
 | 32 | Fri 30th Aug | Report deadline. |
 | 33 | Sat 31st Aug | Cleanup repository. |
 | 34 | Sun 1st Sep  | Presentation. |
