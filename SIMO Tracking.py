@@ -120,6 +120,10 @@ class SIMOModel(nn.Module):
             resnet = models.resnet18(weights=models.ResNet18_Weights.DEFAULT)
             self.backbone = nn.Sequential(*list(resnet.children())[:-1])
             backbone_out_features = 512
+        elif arch == "fcn-resnet":
+            resnet = models.resnet50(weights=models.ResNet50_Weights.DEFAULT)
+            self.backbone = nn.Sequential(*list(resnet.children())[:-1])
+            backbone_out_features = 2048
         elif arch == "fcn-vgg":
             self.backbone = models.vgg16(weights=models.VGG16_Weights.DEFAULT)
             # resnet = models.resnet50(weights=models.ResNet50_Weights.DEFAULT)
@@ -1031,11 +1035,13 @@ def main():
 
     train_loader = DataLoader(train_dataset, batch_size=8, shuffle=True)
     val_loader = DataLoader(val_dataset, batch_size=8, shuffle=False)
-
+    print(BACKBONE)
     model = SIMOModel(max_bboxes=max_bboxes, arch=BACKBONE).to(device)
+    
     print("Number of trainable parameters: ", sum(p.numel() for p in model.parameters() if p.requires_grad))
     print("Number of untrainable parameters: ", sum(p.numel() for p in model.parameters() if not p.requires_grad))
     print("Number of layers: ", len(list(model.parameters())))
+    return
     
     train_losses, val_losses = model.train_model(train_loader, val_loader, num_epochs=500, lr=0.00001, patience=10)
 
