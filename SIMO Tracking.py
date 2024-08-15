@@ -1033,6 +1033,9 @@ def main():
     val_loader = DataLoader(val_dataset, batch_size=8, shuffle=False)
 
     model = SIMOModel(max_bboxes=max_bboxes, arch=BACKBONE).to(device)
+    print("Number of trainable parameters: ", sum(p.numel() for p in model.parameters() if p.requires_grad))
+    print("Number of untrainable parameters: ", sum(p.numel() for p in model.parameters() if not p.requires_grad))
+    print("Number of layers: ", len(list(model.parameters())))
     
     train_losses, val_losses = model.train_model(train_loader, val_loader, num_epochs=500, lr=0.00001, patience=10)
 
