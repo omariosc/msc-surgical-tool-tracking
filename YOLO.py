@@ -60,7 +60,7 @@ def train(n):
         name=f"yolov8{n}-detect-art",
         save_conf=True,
         save_crop=True,
-        save_txt=True,
+        save_txt=False,
         optimize=True,
         amp=True,
         patience=10,  # initially 10
@@ -71,8 +71,8 @@ def train(n):
 def test(n):
     model = YOLO(f"chkpts/ART/v8{n}/yolov8{n}-detect-art/weights/best.pt")
     model.to(device)
-    # results = model.val(data=config_path)
-    # print(results.results_dict)
+    results = model.val(data=config_path)
+    print(results.results_dict)
 
     model.track(
         # "D:\Data\RARP-45_train/train\Log_D2P280782_2017.11.20_12.20.03_4\DVC\EndoscopeImageMemory_0_sync.avi",

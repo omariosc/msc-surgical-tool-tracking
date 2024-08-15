@@ -61,7 +61,7 @@ def train(n):
         name=f"yolov8{n}-detect-6dof",
         save_conf=True,
         save_crop=True,
-        save_txt=True,
+        save_txt=False,
         optimize=True,
         amp=True,
         patience=10,
