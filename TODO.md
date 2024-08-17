@@ -20,15 +20,15 @@
 | 16 | Tues 13th Aug  | ~~Fix YOLO tracking issue. Train new SIMO model on ART-Net, 6DOF and obtained tracking videos.~~ |
 | 17 | Wed 14th Aug   | ~~Generated all annotations using Yolov10X. Create table of results. YOLOv8 models on 6DOF.~~ |
 | 18 | Thurs 15th Aug | ~~Processed annotations for RetinaNet anchor-box optimisation. YOLOv8 models on ART-Net. Run RetinaNet (with and without anchor-box optimisation) and DETR on 6DOF and ART-Net.~~ |
-| 19 | Fri 16th Aug   | |~~Prepared models for running.~~ |
-| 20 | Sat 17th Aug   | Run remaining RetinaNet, EfficientDet and SIMO models. Introduction. |
-| 21 | Sun 18th Aug   | Background Research. |
-| 22 | Mon 19th Aug   | Background Research. |
+| 19 | Fri 16th Aug   | ~~Prepared models and data for running future experiments.~~ |
+| 20 | Sat 17th Aug   | ~~Run remaining RetinaNet models. Run EfficientDet models.~~ Introduction. |
+| 21 | Sun 18th Aug   | Run remaining SIMO models. Background Research. |
+| 22 | Mon 19th Aug   | Rerun validation on YOLOv8 and YOLOv10 on 6DOF and ART-Net at 0.5 IoU. Background Research. |
 | 23 | Tues 20th Aug  | Background Research. |
 | 24 | Wed 21st Aug   | Methodology. |
 | 25 | Thurs 22nd Aug | Methodology. |
 | 26 | Fri 23rd Aug   | Methodology. |
-| 27 | Sat 24th Aug   | Results. |
+| 27 | Sat 24th Aug   | Make abstract teaser image. Results. |
 | 28 | Mon 26th Aug   | Results. |
 | 29 | Tues 27th Aug  | Discussion. |
 | 30 | Wed 28th Aug   | Discusion. |
