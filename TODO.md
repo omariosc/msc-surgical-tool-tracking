@@ -19,11 +19,11 @@
 | 15 | Mon 12th Aug | ~~The SIMO (anchor-free model) needs to be trained and evaluated on the 6DOF test sets with key metrics extracted. Add outline document notes.~~ |
 | 16 | Tues 13th Aug  | ~~Fix YOLO tracking issue. Train new SIMO model on ART-Net, 6DOF and obtained tracking videos.~~ |
 | 17 | Wed 14th Aug   | ~~Generated all annotations using Yolov10X. Create table of results. YOLOv8 models on 6DOF.~~ |
-| 18 | Thurs 15th Aug | ~~Processed annotations for RetinaNet anchor-box optimisation. YOLOv8 models on ART-Net. Run RetinaNet (with and without anchor-box optimisation) and DETR on 6DOF and ART-Net.~~ |
+| 18 | Thurs 15th Aug | ~~Processed annotations for RetinaNet anchor-box optimisation. YOLOv8 models on ART-Net. Run RetinaNet (with and without anchor-box optimisation) on 6DOF and ART-Net.~~ |
 | 19 | Fri 16th Aug   | ~~Prepared models and data for running future experiments.~~ |
-| 20 | Sat 17th Aug   | ~~Run remaining RetinaNet models. Run EfficientDet models.~~ Introduction. |
-| 21 | Sun 18th Aug   | Run remaining SIMO models. Background Research. |
-| 22 | Mon 19th Aug   | Rerun validation on YOLOv8 and YOLOv10 on 6DOF and ART-Net at 0.5 IoU. Background Research. |
+| 20 | Sat 17th Aug   | ~~Run remaining RetinaNet models. Run EfficientDet models.~~ |
+| 21 | Sun 18th Aug   | Run remaining EfficientDet models and produce videos. Introduction. |
+| 22 | Mon 19th Aug   | Rerun validation on YOLOv8 and YOLOv10 on 6DOF and ART-Net at 0.5 IoU and get non-tracked videos. Run remaning SIMO models. Background Research. |
 | 23 | Tues 20th Aug  | Background Research. |
 | 24 | Wed 21st Aug   | Methodology. |
 | 25 | Thurs 22nd Aug | Methodology. |
