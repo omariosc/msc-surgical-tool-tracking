@@ -77,7 +77,7 @@ def test(n, v):
     results = model.val(data=config_path)
     print(results.results_dict)
     model.predict(
-        f"data/6DOF/Test 1.mp4",
+        f"data/6DOF/Videos/Test 1.mp4",
         save=True,
         show=False,
         task="detect",
@@ -97,7 +97,7 @@ def track(n, show=False, save=True):
         if i != 1:
             continue
         model.track(
-            f"data/6DOF/Test {i}.mp4",
+            f"data/6DOF/Videos/Test {i}.mp4",
             # "data/6DOF/Dataset.mp4",
             tracker="bytetrack.yaml",
             save=save,

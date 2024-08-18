@@ -1,10 +1,10 @@
 import os
 
 models = ["n", "s", "m", "l", "x", "b"]
-v = ["8", "10"]
+versions = ["8", "10"]
 
 for m in models:
-    for v in v:
+    for v in versions:
         if not os.path.exists(f"chkpts/6DOF/v{v}{m}"):
             os.mkdir(f"chkpts/6DOF/v{v}{m}")
         os.system(
@@ -15,7 +15,4 @@ for m in models:
         if not os.path.exists(f"chkpts/ART/v{v}{m}"):
             os.mkdir(f"chkpts/ART/v{v}{m}")
         os.system(f'python YOLO.py "{m}" "{v}" > "chkpts/ART/v{v}{m}/yolov{v}{m}-val.txt"')
-
-for m in models:
-    for v in v:
         print(f"Testing model {m} with version {v}")
