@@ -14,7 +14,7 @@ torch.cuda.manual_seed(seed)
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 # print(device)
 
-dataset_path = "data/ART-Net/"
+# dataset_path = "data/ART-Net/"
 
 # Create a configuration file for YOLOv10
 # config_content = f"""
@@ -68,69 +68,45 @@ def train(n):
     )
 
 
-def test(n):
-    model = YOLO(f"chkpts/ART/v8{n}/yolov8{n}-detect-art/weights/best.pt")
-    model.to(device)
+def test(n, v):
+    if v == "8":
+        model = YOLO(f"chkpts/ART/v8{n}/yolov8{n}-detect-art/weights/best.pt").to(device)
+    else:
+        model = YOLOv10(f"chkpts/ART/v10{n}/yolov10{n}-detect-art/weights/best.pt").to(device)
+    
     results = model.val(data=config_path)
     print(results.results_dict)
 
-    model.track(
-        # "D:\Data\RARP-45_train/train\Log_D2P280782_2017.11.20_12.20.03_4\DVC\EndoscopeImageMemory_0_sync.avi",
+    model.predict(
         f"data\EndoVis 2015\Tracking Rigid Testing Revision 6.mp4",
-        # "data/6DOF/Dataset.mp4",
-        tracker="bytetrack.yaml",
         save=True,
         show=False,
-        # save_dir=f"chkpts/ART/v10{n}",
-        # stream=True,
+        task="detect"
     )
-
-    # model.track(
-    #     # "D:\Data\RARP-45_train/train\Log_D2P280782_2017.11.20_12.20.03_4\DVC\EndoscopeImageMemory_0_sync.avi",
-    #     "data/6DOF/Test 5 Labelled.mp4",
-    #     # "data/6DOF/Dataset.mp4",
-    #     tracker="bytetrack.yaml",
-    #     save=True,
-    #     show=False,
-    #     save_dir=f"chkpts/ART/v10{n}",
-    #     stream=True,
-    # )
-
-    # for i in range (1,7):
-    #     model.track(
-    #         f"data\EndoVis 2015\Tracking Rigid Testing Revision {i}.mp4",
-    #         tracker="bytetrack.yaml",
-    #         save=True,
-    #         show=False,
-    #         # save_dir=f"chkpts/ART/v10{n}",
-    #         # stream=True,
-    #     )
 
 if __name__ == "__main__":
     freeze_support()
 
-    # models = ["n", "s", "m", "b", "l", "x"]
-
-    # for m in models:
-
     m = sys.argv[1]
+    v = str(sys.argv[2])
+    
     # Save output to a file
     orig_stdout = sys.stdout
-    f = open(f"chkpts/ART/v8{m}/yolov8{m}-code-out.txt", "w")
+    f = open(f"chkpts/ART/v{v}{m}/yolov{v}{m}-val-out.txt", "w")
     sys.stdout = f
 
-    # Log time to train
-    print(f"Training model {m}")
-    start = time.time()
-    # Train the model
-    train(m)
-    end = time.time()
-    print(f"Time to train model {m}: {end - start}")
+    # # Log time to train
+    # print(f"Training model {m}")
+    # start = time.time()
+    # # Train the model
+    # train(m)
+    # end = time.time()
+    # print(f"Time to train model {m}: {end - start}")
 
     print(f"Testing model {m}")
     start = time.time()
     # Test the model
-    test(m)
+    test(m, v)
     end = time.time()
     print(f"Time to test model {m}: {end - start}")
 

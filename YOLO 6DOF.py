@@ -15,7 +15,7 @@ torch.cuda.manual_seed(seed)
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 # print(device)
 
-dataset_path = "data/6DOF/"
+# dataset_path = "data/6DOF/"
 
 # # Create a configuration file for YOLOv10
 # config_content = f"""
@@ -68,16 +68,19 @@ def train(n):
         save_period=1,
     )
 
-def test(n):
-    model = YOLO(f"chkpts/6DOF/v8{n}/yolov8{n}-detect-6dof/weights/best.pt")
-    model.to(device)
+def test(n, v):
+    if v == "8":
+        model = YOLO(f"chkpts/6DOF/v8{n}/yolov8{n}-detect-6dof/weights/best.pt").to(device)
+    else:
+        model = YOLOv10(f"chkpts/6DOF/v10{n}/yolov10{n}-detect-6dof/weights/best.pt").to(device)
+        
     results = model.val(data=config_path)
     print(results.results_dict)
-    model.track(
+    model.predict(
         f"data/6DOF/Test 1.mp4",
-        tracker="bytetrack.yaml",
         save=True,
         show=False,
+        task="detect",
     )
 
 
@@ -105,28 +108,26 @@ def track(n, show=False, save=True):
 if __name__ == "__main__":
     freeze_support()
 
-    # models = ["n", "s", "m", "b", "l", "x"]
-
-    # # for m in models:
     m = sys.argv[1]
-    # m = "x"
+    v = str(sys.argv[2])
+
     # Save output to a file
     orig_stdout = sys.stdout
-    f = open(f"chkpts/6DOF/v8{m}/yolov8{m}-train-out.txt", "w")
+    f = open(f"chkpts/6DOF/v{v}{m}/yolov{v}{m}-val-out.txt", "w")
     sys.stdout = f
 
-    # Log time to train
-    print(f"Training model {m}")
-    start = time.time()
-    # Train the model
-    train(m)
-    end = time.time()
-    print(f"Time to train model {m}: {end - start}")
+    # # Log time to train
+    # print(f"Training model {m}")
+    # start = time.time()
+    # # Train the model
+    # train(m)
+    # end = time.time()
+    # print(f"Time to train model {m}: {end - start}")
 
     print(f"Testing model {m}")
     start = time.time()
     # Test the model
-    test(m)
+    test(m, v)
     # track(m, show=True, save=False)
     end = time.time()
     print(f"Time to test model {m}: {end - start}")
