@@ -328,7 +328,7 @@ class SIMOModel(nn.Module):
                 optimizer.step()
                 running_loss += loss.item()
 
-                # print(f"Batch {batch+1}/{len(train_loader)}, Loss: {loss.item()}")
+                print(f"Batch {batch+1}/{len(train_loader)}, Loss: {loss.item()}")
                 torch.cuda.empty_cache()
                 torch.cuda.empty_cache()
 
@@ -1041,9 +1041,9 @@ def main():
     print("Number of trainable parameters: ", sum(p.numel() for p in model.parameters() if p.requires_grad))
     print("Number of untrainable parameters: ", sum(p.numel() for p in model.parameters() if not p.requires_grad))
     print("Number of layers: ", len(list(model.parameters())))
-    return
     
-    train_losses, val_losses = model.train_model(train_loader, val_loader, num_epochs=500, lr=0.00001, patience=10)
+    
+    train_losses, val_losses = model.train_model(train_loader, val_loader)
 
     # Plot training and validation losses
     plt.plot(train_losses, label="Train Loss")

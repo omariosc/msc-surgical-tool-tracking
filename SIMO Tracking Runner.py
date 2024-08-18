@@ -8,7 +8,7 @@ for d in data:
         if (d == "6DOF" and (a == "fcn-resnet" or a == "vgg")) or (d == "ART" and (a != "resnet50")):
             continue
         print(d, a)
-        os.makedirs(f"chkpts/SIMO/{d}/{a}", exist_ok=True)
+        os.makedirs(f"chkpts/SIMO2/{d}/{a}", exist_ok=True)
         os.system(
-            f'python "SIMO Tracking".py {d} {a}> "chkpts/SIMO/{d}/{a}/{a}.txt"'
+            f'python "SIMO Tracking".py {d} {a}> "chkpts/SIMO2/{d}/{a}/{a}.txt"'
         )
