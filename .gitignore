@@ -1,13 +1,9 @@
-data/EndoVis 2015/*
-data/ART-Net/*
-data/6DOF/*
+data/*
 repos/*
 results/*
-.DS_Store
-*.pt
-tmp*
 chkpts/*
-!best.pt
+.DS_Store
+tmp*
 runs/
 .vscode
 preprocess.py

@@ -23,14 +23,14 @@
 | 19 | Fri 16th Aug   | ~~Prepared models and data for running future experiments.~~ |
 | 20 | Sat 17th Aug   | ~~Run remaining RetinaNet models. Run EfficientDet models. Introduction.~~ |
 | 21 | Sun 18th Aug   | ~~Run remaining EfficientDet models and produce videos. Rerun validation on YOLOv8 and YOLOv10 on 6DOF and ART-Net at 0.5 IoU and get non-tracked videos. Improve tracking and get new tracking videos. Scheduled running SIMO models. Introduction.~~ |
-| 22 | Mon 19th Aug   | Run DETR models. Introduction. |
+| 22 | Mon 19th Aug   | ~~Run DETR models. Introduction. Computer vision and AI methods. PRISMA diagram.~~ |
 | 23 | Tues 20th Aug  | Background Research. |
 | 24 | Wed 21st Aug   | Background Research. |
 | 25 | Thurs 22nd Aug | Background Research. |
 | 26 | Fri 23rd Aug   | Methodology. |
 | 27 | Sat 24th Aug   | Methodology. |
 | 28 | Mon 26th Aug   | Make abstract teaser image. Results. |
-| 29 | Tues 27th Aug  | Results. |
+| 29 | Tues 27th Aug  | Make combined tracking video. Results. |
 | 30 | Wed 28th Aug   | Discusion. |
 | 31 | Thurs 29th Aug | Discussion. |
 | 32 | Fri 30th Aug | Report deadline. |
