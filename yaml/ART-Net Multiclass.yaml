@@ -1,7 +1,0 @@
-
-datasets: 
-train: ../data/ART-Net//images/train
-val: ../data/ART-Net//images/val
-
-nc: 2  # number of classes
-names: ['tool', 'tip']  # class names
